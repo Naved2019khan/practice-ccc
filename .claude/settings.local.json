@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -o \"Overriding unusable DNS servers.\\\\{0,120\\\\}\" .next/server/app/api/auth/me/route.js)"
+    ]
+  }
+}

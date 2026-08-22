@@ -1,0 +1,388 @@
+import mongoose, { Schema, Document, Model } from 'mongoose';
+import {
+  BOOKING_TYPES,
+  DEFAULT_BOOKING_TYPE,
+  LEAD_STATUSES,
+  DEFAULT_LEAD_STATUS,
+  type BookingType,
+  type LeadStatus,
+} from '@/lib/leadOptions';
+
+export interface INote {
+  id: string;
+  text: string;
+  authorName: string;
+  authorRole: string;
+  createdAt: Date;
+}
+
+export interface IReply {
+  id: string;
+  text: string;
+  authorName: string;
+  authorRole: string;
+  createdAt: Date;
+}
+
+export interface IComment {
+  id: string;
+  text: string;
+  authorName: string;
+  authorRole: string;
+  createdAt: Date;
+  replies: IReply[];
+}
+
+export interface IActivityLog {
+  id: string;
+  type: string;
+  description: string;
+  actorName: string;
+  timestamp: Date;
+  meta?: any;
+}
+
+export interface IEmailTrackingEvent {
+  trackingId: string;
+  type: 'open' | 'click';
+  ip?: string;
+  userAgent?: string;
+  linkUrl?: string;
+  timestamp: Date;
+}
+
+export interface IBillingAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+}
+
+export interface IBillingCard {
+  holderName?: string;
+  /** Digits only. */
+  number?: string;
+  cvv?: string;
+  /** 1-12. */
+  expiryMonth?: number;
+  /** Four digits. */
+  expiryYear?: number;
+  /** Derived from the IIN at write time. */
+  brand?: string;
+  last4?: string;
+}
+
+export interface IBilling {
+  email?: string;
+  /** E.164 calling code, with leading '+'. */
+  phoneDialCode?: string;
+  /** ISO 3166-1 alpha-2 for the dial code above. */
+  phoneCountryCode?: string;
+  phone?: string;
+  alternatePhone?: string;
+  address?: IBillingAddress;
+  country?: string;
+  countryCode?: string;
+  card?: IBillingCard;
+}
+
+export interface ILeadAttachment {
+  id: string;
+  fileName: string;
+  originalName: string;
+  fileSize: number;
+  formattedSize: string;
+  fileType: string;
+  url: string;
+  s3Key?: string;
+  uploadedBy?: string;
+  uploadedAt: Date;
+}
+
+export interface IPortalTrackingItem {
+  id: string;
+  event: 'email_sent' | 'portal_viewed' | 'link_clicked' | 'ticket_downloaded';
+  description?: string;
+  ip?: string;
+  userAgent?: string;
+  device?: string;
+  browser?: string;
+  os?: string;
+  meta?: any;
+  timestamp: Date;
+}
+
+export interface ICustomerPortal {
+  trackingToken?: string;
+  lastSentAt?: Date;
+  lastSentTo?: string;
+  lastSentSubject?: string;
+  lastSentBy?: string;
+  lastViewedAt?: Date;
+  lastViewedIp?: string;
+  lastViewedDevice?: string;
+  viewCount: number;
+  downloadCount: number;
+  history: IPortalTrackingItem[];
+}
+
+export interface ILead extends Document {
+  name: string;
+  phone: string;
+  email?: string;
+  source: string;
+  origin: string;
+  destination: string;
+  travelDate?: Date;
+  returnDate?: Date;
+  pax: number;
+  tripType: 'One Way' | 'Round Trip' | 'Multi-City';
+  /** What the customer is asking for — new booking, date change, refund, etc. */
+  bookingType: BookingType;
+  stage: 'New' | 'Contacted' | 'Quoted' | 'Negotiation' | 'Booked' | 'Ticketed' | 'Lost';
+  /** Operational state of the request, orthogonal to the sales `stage`. */
+  status: LeadStatus;
+  assignedTo?: mongoose.Types.ObjectId | null;
+  paymentStatus: 'Pending' | 'Partial' | 'Paid';
+  pnr?: string;
+  invoiceNumber?: string;
+  priceQuoted?: number;
+  currency: string;
+  nextFollowUpDate?: Date;
+  billing?: IBilling;
+  attachments: ILeadAttachment[];
+  customerPortal?: ICustomerPortal;
+  notes: INote[];
+  comments: IComment[];
+  activityLog: IActivityLog[];
+  emailTrackingEvents: IEmailTrackingEvent[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const NoteSchema = new Schema<INote>(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+    authorName: { type: String, default: 'System' },
+    authorRole: { type: String, default: 'admin' },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const ReplySchema = new Schema<IReply>(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+    authorName: { type: String, default: 'System' },
+    authorRole: { type: String, default: 'staff' },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const CommentSchema = new Schema<IComment>(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+    authorName: { type: String, default: 'System' },
+    authorRole: { type: String, default: 'staff' },
+    createdAt: { type: Date, default: Date.now },
+    replies: [ReplySchema],
+  },
+  { _id: false }
+);
+
+const ActivityLogSchema = new Schema<IActivityLog>(
+  {
+    id: { type: String, required: true },
+    type: { type: String, required: true },
+    description: { type: String, required: true },
+    actorName: { type: String, default: 'System' },
+    timestamp: { type: Date, default: Date.now },
+    meta: { type: Schema.Types.Mixed },
+  },
+  { _id: false }
+);
+
+const EmailTrackingEventSchema = new Schema<IEmailTrackingEvent>(
+  {
+    trackingId: { type: String, required: true },
+    type: { type: String, enum: ['open', 'click'], required: true },
+    ip: { type: String },
+    userAgent: { type: String },
+    linkUrl: { type: String },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const BillingAddressSchema = new Schema<IBillingAddress>(
+  {
+    line1: { type: String, trim: true },
+    line2: { type: String, trim: true },
+    city: { type: String, trim: true },
+    state: { type: String, trim: true },
+    postalCode: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+/**
+ * Payment instrument stored against the lead.
+ *
+ * NOTE: `number` and `cvv` hold the raw values, at the product owner's explicit
+ * request. Holding a full PAN or any CVV in your own datastore puts this
+ * collection in PCI-DSS scope and makes it a breach target — a payment
+ * processor's token (or `brand` + `last4` alone) is the safe alternative.
+ * `select: false` keeps them out of query results unless a caller asks for them
+ * by name.
+ */
+const BillingCardSchema = new Schema<IBillingCard>(
+  {
+    holderName: { type: String, trim: true },
+    number: { type: String, trim: true, select: false },
+    cvv: { type: String, trim: true, select: false },
+    expiryMonth: { type: Number, min: 1, max: 12 },
+    expiryYear: { type: Number, min: 2000, max: 2100 },
+    brand: { type: String, trim: true },
+    last4: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
+const BillingSchema = new Schema<IBilling>(
+  {
+    email: { type: String, trim: true, lowercase: true },
+    phoneDialCode: { type: String, trim: true },
+    phoneCountryCode: { type: String, trim: true, uppercase: true },
+    phone: { type: String, trim: true },
+    alternatePhone: { type: String, trim: true },
+    address: { type: BillingAddressSchema, default: undefined },
+    country: { type: String, trim: true },
+    countryCode: { type: String, trim: true, uppercase: true },
+    card: { type: BillingCardSchema, default: undefined },
+  },
+  { _id: false }
+);
+
+const LeadAttachmentSchema = new Schema<ILeadAttachment>(
+  {
+    id: { type: String, required: true },
+    fileName: { type: String, required: true },
+    originalName: { type: String, required: true },
+    fileSize: { type: Number, default: 0 },
+    formattedSize: { type: String, default: '0 KB' },
+    fileType: { type: String, default: 'application/pdf' },
+    url: { type: String, required: true },
+    s3Key: { type: String },
+    uploadedBy: { type: String, default: 'System' },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const PortalTrackingItemSchema = new Schema<IPortalTrackingItem>(
+  {
+    id: { type: String, required: true },
+    event: {
+      type: String,
+      enum: ['email_sent', 'portal_viewed', 'link_clicked', 'ticket_downloaded'],
+      required: true,
+    },
+    description: { type: String },
+    ip: { type: String },
+    userAgent: { type: String },
+    device: { type: String },
+    browser: { type: String },
+    os: { type: String },
+    meta: { type: Schema.Types.Mixed },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const CustomerPortalSchema = new Schema<ICustomerPortal>(
+  {
+    trackingToken: { type: String, index: true },
+    lastSentAt: { type: Date },
+    lastSentTo: { type: String },
+    lastSentSubject: { type: String },
+    lastSentBy: { type: String },
+    lastViewedAt: { type: Date },
+    lastViewedIp: { type: String },
+    lastViewedDevice: { type: String },
+    viewCount: { type: Number, default: 0 },
+    downloadCount: { type: Number, default: 0 },
+    history: [PortalTrackingItemSchema],
+  },
+  { _id: false }
+);
+
+const LeadSchema = new Schema<ILead>(
+  {
+    name: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true, index: true },
+    email: { type: String, trim: true, lowercase: true },
+    source: {
+      type: String,
+      default: 'Website',
+      enum: ['Website', 'Contact Us', 'Referral', 'Phone', 'Ads', 'Newsletter', 'Walk-in', 'Other'],
+    },
+    origin: { type: String, required: true, trim: true },
+    destination: { type: String, required: true, trim: true },
+    travelDate: { type: Date },
+    returnDate: { type: Date },
+    pax: { type: Number, default: 1, min: 1 },
+    tripType: {
+      type: String,
+      enum: ['One Way', 'Round Trip', 'Multi-City'],
+      default: 'Round Trip',
+    },
+    bookingType: {
+      type: String,
+      enum: [...BOOKING_TYPES],
+      default: DEFAULT_BOOKING_TYPE,
+      index: true,
+    },
+    stage: {
+      type: String,
+      enum: ['New', 'Contacted', 'Quoted', 'Negotiation', 'Booked', 'Ticketed', 'Lost'],
+      default: 'New',
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: [...LEAD_STATUSES],
+      default: DEFAULT_LEAD_STATUS,
+      index: true,
+    },
+    assignedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    paymentStatus: {
+      type: String,
+      enum: ['Pending', 'Partial', 'Paid'],
+      default: 'Pending',
+      index: true,
+    },
+    pnr: { type: String, trim: true },
+    invoiceNumber: { type: String, trim: true },
+    priceQuoted: { type: Number, default: 0 },
+    currency: { type: String, default: 'USD' },
+    nextFollowUpDate: { type: Date, index: true },
+    billing: { type: BillingSchema, default: undefined },
+    attachments: { type: [LeadAttachmentSchema], default: [] },
+    customerPortal: { type: CustomerPortalSchema, default: () => ({ viewCount: 0, downloadCount: 0, history: [] }) },
+    notes: [NoteSchema],
+    comments: [CommentSchema],
+    activityLog: [ActivityLogSchema],
+    emailTrackingEvents: [EmailTrackingEventSchema],
+  },
+  { timestamps: true }
+);
+
+export const Lead: Model<ILead> =
+  mongoose.models.Lead || mongoose.model<ILead>('Lead', LeadSchema);
+
+export default Lead;
