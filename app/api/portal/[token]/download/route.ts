@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { Lead } from '@/models/Lead';
 import { parseUserAgent, getClientIp } from '@/lib/tracking';
+import mongoose from 'mongoose';
 
 export async function GET(
   req: NextRequest,
@@ -16,8 +17,17 @@ export async function GET(
       return NextResponse.json({ error: 'Missing token' }, { status: 400 });
     }
 
+    const cleanToken = decodeURIComponent(token).trim();
+
     await connectToDatabase();
-    const lead = await Lead.findOne({ 'customerPortal.trackingToken': token });
+    const lead = await Lead.findOne({
+      $or: [
+        { 'customerPortal.trackingToken': cleanToken },
+        { 'customerPortal.trackingToken': token },
+        ...(mongoose.Types.ObjectId.isValid(cleanToken) ? [{ _id: cleanToken }] : []),
+        ...(mongoose.Types.ObjectId.isValid(token) ? [{ _id: token }] : []),
+      ],
+    });
 
     if (!lead) {
       return NextResponse.json({ error: 'Itinerary not found' }, { status: 404 });
@@ -36,7 +46,7 @@ export async function GET(
 
     if (!lead.customerPortal) {
       lead.customerPortal = {
-        trackingToken: token,
+        trackingToken: cleanToken,
         viewCount: 0,
         downloadCount: 1,
         history: [],
@@ -46,6 +56,9 @@ export async function GET(
     }
 
     const eventId = `ev_dl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    if (!Array.isArray(lead.customerPortal.history)) {
+      lead.customerPortal.history = [];
+    }
     lead.customerPortal.history.push({
       id: eventId,
       event: 'ticket_downloaded',
@@ -59,16 +72,23 @@ export async function GET(
       timestamp: now,
     });
 
-    lead.activityLog.push({
+    const activityItem = {
       id: `act_ticket_dl_${Date.now()}`,
       type: 'ticket_downloaded',
       description: `Ticket "${attachment.originalName}" downloaded by customer (IP: ${ip})`,
       actorName: 'Passenger',
       timestamp: now,
       meta: { attachmentId: attachment.id, fileName: attachment.originalName, ip },
-    });
+    };
 
-    await lead.save();
+    await Lead.findByIdAndUpdate(lead._id, {
+      $set: {
+        customerPortal: lead.customerPortal,
+      },
+      $push: {
+        activityLog: activityItem,
+      },
+    });
 
     // If attachment has external URL or S3 URL, redirect to it; if data URL, return base64
     if (attachment.url.startsWith('data:')) {

@@ -45,14 +45,14 @@ export default function NewsletterPage() {
       <header className="border-b border-ember-border bg-ember-bg/80 backdrop-blur-md px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-btn bg-ember-primary flex items-center justify-center text-white shadow-primary-glow">
-              <Compass className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-btn bg-[#072B66] border border-[#FFC107] flex items-center justify-center text-[#FFC107] font-bold text-sm shadow-sm">
+              ✈
             </div>
             <div>
-              <span className="font-display font-bold text-lg text-ember-text-primary">
-                Ember Flight
+              <span className="font-display font-bold text-lg text-ember-text-primary tracking-tight">
+                AirlinesConsolidator
               </span>
-              <span className="text-[11px] font-semibold tracking-wider text-ember-neutral block uppercase">
+              <span className="text-[10px] font-bold tracking-wider text-amber-700 block uppercase">
                 Fare Intelligence
               </span>
             </div>
@@ -151,7 +151,7 @@ export default function NewsletterPage() {
       </main>
 
       <footer className="border-t border-ember-border py-6 text-center text-xs text-ember-neutral">
-        &copy; {new Date().getFullYear()} Ember Flight Concierge. All rights reserved.
+        &copy; {new Date().getFullYear()} AirlinesConsolidator. All rights reserved.
       </footer>
     </div>
   );

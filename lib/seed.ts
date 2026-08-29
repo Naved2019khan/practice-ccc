@@ -30,49 +30,39 @@ export async function seedDatabase(force = false) {
   const staffPassword = await hashPassword('staff123');
 
   const admin = await User.create({
-    name: 'Eleanor Vance (Admin)',
+    name: 'Admin',
     email: 'admin@flightcrm.com',
     password: adminPassword,
     role: 'admin',
     active: true,
-    phone: '+1 (555) 234-5678',
+    phone: '+1 (888) 883-0727',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   });
 
   const staff1 = await User.create({
-    name: 'Sarah Jenkins',
-    email: 'sarah.agent@flightcrm.com',
+    name: 'Staff One',
+    email: 'staff1@flightcrm.com',
     password: staffPassword,
     role: 'staff',
     active: true,
-    phone: '+1 (555) 345-6789',
+    phone: '+1 (888) 883-0727',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
   });
 
   const staff2 = await User.create({
-    name: 'Marcus Brody',
-    email: 'marcus.agent@flightcrm.com',
+    name: 'Staff Two',
+    email: 'staff2@flightcrm.com',
     password: staffPassword,
     role: 'staff',
     active: true,
-    phone: '+1 (555) 456-7890',
+    phone: '+1 (888) 883-0727',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  });
-
-  const staff3 = await User.create({
-    name: 'Elena Rostova',
-    email: 'elena.agent@flightcrm.com',
-    password: staffPassword,
-    role: 'staff',
-    active: true,
-    phone: '+1 (555) 567-8901',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
   });
 
   // 2. Default Settings
   await Setting.create({ key: 'autoAssignEnabled', value: true });
   await Setting.create({ key: 'roundRobinIndex', value: 0 });
-  await Setting.create({ key: 'companyName', value: 'Ember Flight Concierge' });
+  await Setting.create({ key: 'companyName', value: 'AirlinesConsolidator' });
   await Setting.create({ key: 'defaultCurrency', value: 'USD' });
 
   // 3. Email Templates
@@ -147,6 +137,35 @@ export async function seedDatabase(force = false) {
   
   <p>Please carry a valid government photo ID / passport matching passenger names at check-in.</p>
   <p style="color: #78716C; font-size: 13px;">Safe travels,<br><strong>{{agent_name}}</strong> &bull; Ember Flight Concierge</p>
+</div>`,
+      createdBy: admin._id,
+    },
+    {
+      name: 'Booking Confirmation & Payment Authorization',
+      category: 'Ticket Confirmation',
+      subject: 'Booking Confirmation & Payment Authorization Agreement — Ref {{booking_reference}}',
+      bodyHtml: `<div style="font-family: Arial, Helvetica, sans-serif; color: #1a2b4c; max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #E2ECFB;">
+  <div style="background: linear-gradient(135deg, #0B3C8A 0%, #1657B8 100%); padding: 24px; color: #ffffff;">
+    <span style="display:inline-block; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px; text-transform:uppercase;">Booking Confirmed</span>
+    <h2 style="color:#ffffff; font-size:20px; margin:10px 0 4px 0;">Booking Confirmation &amp; Payment Authorization</h2>
+    <p style="color:#cfe0ff; font-size:12px; margin:0;">Reference: <strong>{{booking_reference}}</strong> &bull; Agent: <strong>{{agent_name}}</strong></p>
+  </div>
+  <div style="padding: 20px;">
+    <h3 style="color:#0B3C8A; font-size:13px; text-transform:uppercase; margin-top:0;">Passenger Details</h3>
+    <p style="font-size:13px; margin: 4px 0;"><strong>Name:</strong> {{name}} &bull; <strong>Phone:</strong> {{phone}} &bull; <strong>Email:</strong> {{email}}</p>
+    <hr style="border:0; border-top:1px solid #E2ECFB; margin:16px 0;" />
+    <h3 style="color:#0B3C8A; font-size:13px; text-transform:uppercase;">Itinerary Details</h3>
+    <div style="background:#F3F7FF; border:1px solid #E2ECFB; border-radius:8px; padding:12px; margin:10px 0;">
+      <p style="margin:4px 0; font-size:13px;"><strong>Flight:</strong> {{flight1_airline}} {{flight1_number}} ({{flight1_class}})</p>
+      <p style="margin:4px 0; font-size:13px;"><strong>Departure:</strong> {{flight1_dep_airport}} &bull; {{flight1_dep_datetime}}</p>
+      <p style="margin:4px 0; font-size:13px;"><strong>Arrival:</strong> {{flight1_arr_airport}}</p>
+    </div>
+    <div style="background:#FFF7DA; border:1px solid #FFE58A; border-radius:8px; padding:12px; margin:16px 0; font-size:14px; font-weight:bold; color:#7a5c00;">
+      Total Authorized Amount: <span style="color:#0B3C8A; font-size:18px;">{{currency}} \${{price}}</span>
+    </div>
+    <p style="font-size:12px; color:#5c6b85;">Authorized Card: <strong>{{card_brand}} ending in {{card_last4}}</strong> &bull; Cardholder: <strong>{{card_holder_name}}</strong></p>
+    <p style="font-size:12px; color:#5c6b85;">Support Contact: <strong>{{company_phone}}</strong> &bull; {{company_name}}</p>
+  </div>
 </div>`,
       createdBy: admin._id,
     },
@@ -281,7 +300,7 @@ export async function seedDatabase(force = false) {
       pax: 1,
       tripType: 'One Way',
       stage: 'New',
-      assignedTo: staff3._id,
+      assignedTo: staff1._id,
       paymentStatus: 'Pending',
       priceQuoted: 620,
       currency: 'USD',
@@ -365,7 +384,7 @@ export async function seedDatabase(force = false) {
       pax: 2,
       tripType: 'Round Trip',
       stage: 'Lost',
-      assignedTo: staff3._id,
+      assignedTo: staff1._id,
       paymentStatus: 'Pending',
       priceQuoted: 650,
       currency: 'USD',
@@ -373,7 +392,7 @@ export async function seedDatabase(force = false) {
         {
           id: 'n7',
           text: 'Client opted to redeem airline miles directly.',
-          authorName: staff3.name,
+          authorName: staff1.name,
           authorRole: 'staff',
           createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
         },

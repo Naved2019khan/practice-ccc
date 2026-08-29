@@ -72,10 +72,29 @@ export const PaymentBadge: React.FC<{ status: string; size?: 'sm' | 'md' }> = ({
           Paid
         </Chip>
       );
+    case 'Authorized':
+      return (
+        <Chip variant="primary" size={size} className="bg-blue-600 text-white font-bold">
+          <CheckCircle2 className="w-3 h-3 text-blue-200" />
+          Authorized
+        </Chip>
+      );
     case 'Partial':
       return (
         <Chip variant="warning" size={size} className="font-semibold">
           Partial
+        </Chip>
+      );
+    case 'Failed':
+      return (
+        <Chip variant="error" size={size} className="font-semibold">
+          Failed
+        </Chip>
+      );
+    case 'Refunded':
+      return (
+        <Chip variant="stone" size={size} className="font-semibold">
+          Refunded
         </Chip>
       );
     case 'Pending':

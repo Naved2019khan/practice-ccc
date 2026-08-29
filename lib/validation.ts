@@ -51,12 +51,23 @@ export interface LeadFormValues {
   nextFollowUpDate?: string;
   assignedTo?: string;
   initialNote?: string;
+  passengers?: any[];
+  flightLegs?: any[];
+  multiCityRoutes?: any[];
+  addOns?: {
+    meal?: string;
+    baggage?: string;
+    seat?: string;
+    notes?: string;
+  };
   billing?: BillingFormValues;
 }
 
 /* ------------------------------------------------------------------ atoms */
 
 export const digitsOnly = (v: string): string => v.replace(/\D/g, '');
+
+export const lettersAndSpacesOnly = (v: string): string => v.replace(/[^A-Za-z\s.'"-]/g, '');
 
 export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || String(v).trim() === '';
@@ -262,6 +273,8 @@ export function validateLeadForm(values: LeadFormValues): ValidationErrors {
 
   /* -- customer ------------------------------------------------------- */
   if (isBlank(values.name)) errors.name = 'Passenger name is required';
+  else if (!/^[A-Za-z][A-Za-z .'"-]*$/.test(String(values.name).trim()))
+    errors.name = 'Name must contain letters only';
   else if (String(values.name).trim().length < 2)
     errors.name = 'Enter the passenger’s full name';
 

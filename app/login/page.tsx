@@ -60,15 +60,15 @@ export default function LoginPage() {
         {/* Top Brand */}
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-11 h-11 rounded-btn bg-ember-primary flex items-center justify-center text-white shadow-primary-glow">
-              <Compass className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-btn bg-[#072B66] border-2 border-[#FFC107] flex items-center justify-center text-[#FFC107] font-bold text-lg shadow-sm">
+              ✈
             </div>
             <div>
-              <h1 className="font-display font-bold text-xl text-ember-text-primary">
-                Ember Flight
+              <h1 className="font-display font-bold text-xl text-ember-text-primary tracking-tight">
+                AirlinesConsolidator
               </h1>
-              <span className="text-xs font-semibold uppercase tracking-wider text-ember-neutral">
-                Lead Management CRM
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                Flight Management CRM
               </span>
             </div>
           </div>

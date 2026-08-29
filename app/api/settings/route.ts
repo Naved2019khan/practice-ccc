@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const settingsDocs = await Setting.find({});
     const settings: Record<string, any> = {
       autoAssignEnabled: true,
-      companyName: 'Ember Flight Concierge',
+      companyName: 'AirlinesConsolidator',
       defaultCurrency: 'USD',
       emailProvider: process.env.EMAIL_PROVIDER || 'mock',
     };

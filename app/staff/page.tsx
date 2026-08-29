@@ -174,7 +174,7 @@ export default function StaffPage() {
                     {/* User info */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <Avatar name={staff.name} src={staff.avatar} size="md" />
+                        <Avatar name={staff.name} size="md" />
                         <div>
                           <p className="font-bold text-ember-text-primary">{staff.name}</p>
                           <div className="flex items-center gap-2 text-[11px] text-ember-neutral mt-0.5">

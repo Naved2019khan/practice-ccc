@@ -111,11 +111,6 @@ export default function DashboardPage() {
                 <span>View Full Pipeline</span>
               </Button>
             </Link>
-            <Link href="/import">
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <span>Import CSV</span>
-              </Button>
-            </Link>
           </div>
         </div>
 

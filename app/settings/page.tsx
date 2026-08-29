@@ -22,7 +22,7 @@ import { Select } from '@/components/ui/Select';
 export default function SettingsPage() {
   const [settings, setSettings] = useState<any>({
     autoAssignEnabled: true,
-    companyName: 'Ember Flight Concierge',
+    companyName: 'AirlinesConsolidator',
     defaultCurrency: 'USD',
     emailProvider: 'mock',
   });

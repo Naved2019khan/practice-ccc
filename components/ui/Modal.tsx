@@ -9,7 +9,7 @@ export interface ModalProps {
   title?: string;
   description?: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -53,19 +53,22 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
     '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    full: 'max-w-[95vw]',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       {/* Backdrop with blur */}
       <div
-        className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm transition-opacity duration-200"
+        className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity duration-200 z-0"
         onClick={onClose}
       />
 
       {/* Modal Dialog Card */}
       <div
-        className={`relative w-full ${maxWidths[maxWidth]} bg-ember-surface border border-ember-border rounded-card shadow-modal overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
+        className={`relative w-full ${maxWidths[maxWidth]} bg-ember-surface border border-ember-border rounded-card shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
       >
         {/* Header */}
         {(title || description) && (

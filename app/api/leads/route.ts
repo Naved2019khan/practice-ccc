@@ -133,6 +133,7 @@ export async function GET(req: NextRequest) {
         { origin: searchRegex },
         { destination: searchRegex },
         { pnr: searchRegex },
+        { ticketNumber: searchRegex },
         { invoiceNumber: searchRegex },
       ];
     }
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
       assignedTo: reqAssignedTo,
       paymentStatus = 'Pending',
       pnr,
+      ticketNumber,
       invoiceNumber,
       priceQuoted = 0,
       currency = 'USD',
@@ -276,6 +278,110 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const numPax = Math.max(1, Number(pax) || 1);
+
+    // Passengers sync
+    let finalPassengers = Array.isArray(body.passengers) && body.passengers.length > 0
+      ? body.passengers.map((p: any) => ({
+          id: p.id || `pax_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          firstName: p.firstName?.trim() || '',
+          lastName: p.lastName?.trim() || '',
+          dob: p.dob || '',
+          gender: ['Male', 'Female', 'Other', ''].includes(p.gender) ? p.gender : '',
+          phone: p.phone?.trim() || '',
+          email: p.email?.trim() || '',
+        }))
+      : [];
+
+    if (finalPassengers.length === 0) {
+      const nameParts = name.trim().split(/\s+/);
+      const firstName = nameParts[0] || name.trim();
+      const lastName = nameParts.slice(1).join(' ') || '';
+      finalPassengers.push({
+        id: `pax_${Date.now()}_1`,
+        firstName,
+        lastName,
+        dob: '',
+        gender: '',
+        phone: phone.trim(),
+        email: email?.trim() || '',
+      });
+      for (let i = 2; i <= numPax; i++) {
+        finalPassengers.push({
+          id: `pax_${Date.now()}_${i}`,
+          firstName: `Passenger ${i}`,
+          lastName: '',
+          dob: '',
+          gender: '',
+          phone: '',
+          email: '',
+        });
+      }
+    }
+
+    // Flight legs sync
+    let finalFlightLegs = Array.isArray(body.flightLegs) && body.flightLegs.length > 0
+      ? body.flightLegs.map((l: any) => ({
+          id: l.id || `leg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          carrier: l.carrier?.trim() || '',
+          flightNumber: l.flightNumber?.trim() || '',
+          flightClass: l.flightClass?.trim() || 'Economy',
+          departingAirport: l.departingAirport?.trim() || '',
+          departingAt: l.departingAt || '',
+          arrivingAirport: l.arrivingAirport?.trim() || '',
+          arrivingAt: l.arrivingAt || '',
+          meal: l.meal?.trim() || '',
+          baggage: l.baggage?.trim() || '',
+          seat: l.seat?.trim() || '',
+        }))
+      : [];
+
+    if (finalFlightLegs.length === 0) {
+      finalFlightLegs.push({
+        id: `leg_${Date.now()}_1`,
+        carrier: '',
+        flightNumber: '',
+        flightClass: 'Economy',
+        departingAirport: origin.trim(),
+        departingAt: travelDate ? new Date(travelDate).toISOString() : '',
+        arrivingAirport: destination.trim(),
+        arrivingAt: travelDate ? new Date(travelDate).toISOString() : '',
+      });
+      if (tripType !== 'One Way' && returnDate) {
+        finalFlightLegs.push({
+          id: `leg_${Date.now()}_2`,
+          carrier: '',
+          flightNumber: '',
+          flightClass: 'Economy',
+          departingAirport: destination.trim(),
+          departingAt: new Date(returnDate).toISOString(),
+          arrivingAirport: origin.trim(),
+          arrivingAt: new Date(returnDate).toISOString(),
+        });
+      }
+    }
+
+    // Multi-city routes sync
+    let finalMultiCityRoutes = Array.isArray(body.multiCityRoutes) && body.multiCityRoutes.length > 0
+      ? body.multiCityRoutes.map((r: any, idx: number) => ({
+          id: r.id || `route_${Date.now()}_${idx + 1}`,
+          origin: r.origin?.trim() || '',
+          destination: r.destination?.trim() || '',
+          travelDate: r.travelDate || '',
+        }))
+      : [];
+
+    if (tripType === 'Multi-City' && finalMultiCityRoutes.length === 0) {
+      finalMultiCityRoutes = [
+        {
+          id: `route_${Date.now()}_1`,
+          origin: origin.trim(),
+          destination: destination.trim(),
+          travelDate: travelDate ? new Date(travelDate).toISOString().split('T')[0] : '',
+        },
+      ];
+    }
+
     const newLead = await Lead.create({
       name: name.trim(),
       phone: phone.trim(),
@@ -285,8 +391,19 @@ export async function POST(req: NextRequest) {
       destination: destination.trim(),
       travelDate: travelDate ? new Date(travelDate) : undefined,
       returnDate: returnDate ? new Date(returnDate) : undefined,
-      pax: Number(pax) || 1,
+      pax: numPax,
       tripType,
+      passengers: finalPassengers,
+      flightLegs: finalFlightLegs,
+      multiCityRoutes: finalMultiCityRoutes,
+      addOns: body.addOns
+        ? {
+            meal: body.addOns.meal?.trim() || '',
+            baggage: body.addOns.baggage?.trim() || '',
+            seat: body.addOns.seat?.trim() || '',
+            notes: body.addOns.notes?.trim() || '',
+          }
+        : undefined,
       // Unknown values fall back to the schema default rather than 400-ing an
       // otherwise valid lead.
       bookingType: isBookingType(bookingType) ? bookingType : DEFAULT_BOOKING_TYPE,
@@ -295,6 +412,7 @@ export async function POST(req: NextRequest) {
       assignedTo: finalAssignedTo,
       paymentStatus,
       pnr: pnr?.trim(),
+      ticketNumber: ticketNumber?.trim(),
       invoiceNumber: invoiceNumber?.trim(),
       priceQuoted: Number(priceQuoted) || 0,
       currency,

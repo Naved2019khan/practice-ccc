@@ -1,18 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Plane,
-  Upload,
   FileText,
   Users,
   Settings,
   CheckSquare,
   LogOut,
-  ExternalLink,
   Shield,
   UserCheck,
   Compass,
@@ -21,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from './ui/Avatar';
 import { Chip } from './ui/Chip';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 
 export interface UserSession {
   userId: string;
@@ -38,15 +37,21 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      setShowLogoutConfirm(false);
       if (onLogout) onLogout();
       router.push('/login');
       router.refresh();
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -54,7 +59,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Leads Pipeline', href: '/leads', icon: Plane },
     { label: 'Tasks & Todos', href: '/tasks', icon: CheckSquare },
-    { label: 'Import Leads', href: '/import', icon: Upload },
     { label: 'Email Templates', href: '/templates', icon: FileText },
     ...(user?.role === 'admin'
       ? [{ label: 'Staff Team', href: '/staff', icon: Users, adminOnly: true }]
@@ -67,15 +71,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       {/* Brand Header */}
       <div className="p-5 border-b border-ember-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-btn bg-ember-primary flex items-center justify-center text-white shadow-primary-glow">
-            <Compass className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-btn bg-[#072B66] border border-[#FFC107] flex items-center justify-center text-[#FFC107] font-bold text-sm shadow-sm">
+            ✈
           </div>
           <div>
-            <h1 className="font-display font-bold text-base text-ember-text-primary leading-tight">
-              Ember Flight
+            <h1 className="font-display font-bold text-sm text-ember-text-primary leading-tight tracking-tight">
+              AirlinesConsolidator
             </h1>
-            <span className="text-[11px] font-semibold tracking-wider text-ember-neutral uppercase">
-              Lead Concierge
+            <span className="text-[10px] font-bold tracking-wider text-amber-700 uppercase">
+              Flight CRM
             </span>
           </div>
         </div>
@@ -167,27 +171,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </Link>
           </>
         )}
-
-        {/* Public Pages Quick Access */}
-        <div className="pt-5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ember-neutral">
-          Public Client Forms
-        </div>
-        <Link
-          href="/contact"
-          target="_blank"
-          className="flex items-center justify-between px-3.5 py-2 rounded-btn text-xs font-medium text-ember-text-secondary hover:text-ember-text-primary hover:bg-ember-surface transition-all"
-        >
-          <span>Quote Request Form</span>
-          <ExternalLink className="w-3.5 h-3.5 text-ember-neutral" />
-        </Link>
-        <Link
-          href="/newsletter"
-          target="_blank"
-          className="flex items-center justify-between px-3.5 py-2 rounded-btn text-xs font-medium text-ember-text-secondary hover:text-ember-text-primary hover:bg-ember-surface transition-all"
-        >
-          <span>Newsletter Capture</span>
-          <ExternalLink className="w-3.5 h-3.5 text-ember-neutral" />
-        </Link>
       </nav>
 
       {/* User Footer Profile */}
@@ -213,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </div>
           </div>
           <button
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             title="Sign out"
             className="p-1.5 rounded-btn text-ember-neutral hover:text-ember-error hover:bg-ember-surface-raised transition-colors"
           >
@@ -221,6 +204,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
           </button>
         </div>
       </div>
+
+      {/* Sign Out Confirmation Modal Popup */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={handleLogout}
+        title="Sign Out Confirmation"
+        description="Are you sure you want to log out of Airlines Consolidator CRM?"
+        confirmLabel="Yes, Sign Out"
+        cancelLabel="Stay Signed In"
+        variant="destructive"
+        isLoading={isLoggingOut}
+      />
     </aside>
   );
 };

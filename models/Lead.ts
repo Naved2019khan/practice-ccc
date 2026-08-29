@@ -100,15 +100,55 @@ export interface ILeadAttachment {
   uploadedAt: Date;
 }
 
+export interface IPassenger {
+  id: string;
+  firstName: string;
+  lastName?: string;
+  dob?: string; // stored as ISO date string for simplicity
+  gender?: 'Male' | 'Female' | 'Other' | '';
+  phone?: string;
+  email?: string;
+}
+
+export interface IAddOns {
+  meal?: string;
+  baggage?: string;
+  seat?: string;
+  notes?: string;
+}
+
+export interface IMultiCityRoute {
+  id: string;
+  origin: string;
+  destination: string;
+  travelDate?: string;
+}
+
+export interface IFlightLeg {
+  id: string;
+  carrier?: string;
+  flightNumber?: string;
+  flightClass?: string;
+  departingAirport?: string;
+  departingAt?: string; // ISO datetime string
+  arrivingAirport?: string;
+  arrivingAt?: string;
+  meal?: string;
+  baggage?: string;
+  seat?: string;
+}
+
 export interface IPortalTrackingItem {
   id: string;
-  event: 'email_sent' | 'portal_viewed' | 'link_clicked' | 'ticket_downloaded';
+  event: 'email_sent' | 'portal_viewed' | 'link_clicked' | 'ticket_downloaded' | 'booking_authorized';
   description?: string;
   ip?: string;
   userAgent?: string;
   device?: string;
   browser?: string;
   os?: string;
+  /** For booking_authorized: geo-resolved location string, e.g. "New York, NY, US" */
+  location?: string;
   meta?: any;
   timestamp: Date;
 }
@@ -121,6 +161,7 @@ export interface ICustomerPortal {
   lastSentBy?: string;
   lastViewedAt?: Date;
   lastViewedIp?: string;
+  lastViewedLocation?: string;
   lastViewedDevice?: string;
   viewCount: number;
   downloadCount: number;
@@ -144,14 +185,19 @@ export interface ILead extends Document {
   /** Operational state of the request, orthogonal to the sales `stage`. */
   status: LeadStatus;
   assignedTo?: mongoose.Types.ObjectId | null;
-  paymentStatus: 'Pending' | 'Partial' | 'Paid';
+  paymentStatus: 'Pending' | 'Authorized' | 'Partial' | 'Paid' | 'Failed' | 'Refunded';
   pnr?: string;
+  ticketNumber?: string;
   invoiceNumber?: string;
   priceQuoted?: number;
   currency: string;
   nextFollowUpDate?: Date;
   billing?: IBilling;
   attachments: ILeadAttachment[];
+  passengers: IPassenger[];
+  flightLegs: IFlightLeg[];
+  multiCityRoutes?: IMultiCityRoute[];
+  addOns?: IAddOns;
   customerPortal?: ICustomerPortal;
   notes: INote[];
   comments: IComment[];
@@ -245,8 +291,8 @@ const BillingCardSchema = new Schema<IBillingCard>(
     holderName: { type: String, trim: true },
     number: { type: String, trim: true, select: false },
     cvv: { type: String, trim: true, select: false },
-    expiryMonth: { type: Number, min: 1, max: 12 },
-    expiryYear: { type: Number, min: 2000, max: 2100 },
+    expiryMonth: { type: Number },
+    expiryYear: { type: Number },
     brand: { type: String, trim: true },
     last4: { type: String, trim: true },
   },
@@ -284,12 +330,62 @@ const LeadAttachmentSchema = new Schema<ILeadAttachment>(
   { _id: false }
 );
 
+const PassengerSchema = new Schema<IPassenger>(
+  {
+    id: { type: String, required: true },
+    firstName: { type: String, trim: true, default: '' },
+    lastName: { type: String, trim: true, default: '' },
+    dob: { type: String, default: '' },
+    gender: { type: String, enum: ['Male', 'Female', 'Other', ''], default: '' },
+    phone: { type: String, trim: true, default: '' },
+    email: { type: String, trim: true, lowercase: true, default: '' },
+  },
+  { _id: false }
+);
+
+const MultiCityRouteSchema = new Schema<IMultiCityRoute>(
+  {
+    id: { type: String, required: true },
+    origin: { type: String, trim: true, default: '' },
+    destination: { type: String, trim: true, default: '' },
+    travelDate: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
+const AddOnsSchema = new Schema<IAddOns>(
+  {
+    meal: { type: String, trim: true, default: '' },
+    baggage: { type: String, trim: true, default: '' },
+    seat: { type: String, trim: true, default: '' },
+    notes: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
+const FlightLegSchema = new Schema<IFlightLeg>(
+  {
+    id: { type: String, required: true },
+    carrier: { type: String, trim: true, default: '' },
+    flightNumber: { type: String, trim: true, default: '' },
+    flightClass: { type: String, trim: true, default: 'Economy' },
+    departingAirport: { type: String, trim: true, default: '' },
+    departingAt: { type: String, default: '' },
+    arrivingAirport: { type: String, trim: true, default: '' },
+    arrivingAt: { type: String, default: '' },
+    meal: { type: String, trim: true, default: '' },
+    baggage: { type: String, trim: true, default: '' },
+    seat: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const PortalTrackingItemSchema = new Schema<IPortalTrackingItem>(
   {
     id: { type: String, required: true },
     event: {
       type: String,
-      enum: ['email_sent', 'portal_viewed', 'link_clicked', 'ticket_downloaded'],
+      enum: ['email_sent', 'portal_viewed', 'link_clicked', 'ticket_downloaded', 'booking_authorized'],
       required: true,
     },
     description: { type: String },
@@ -298,6 +394,7 @@ const PortalTrackingItemSchema = new Schema<IPortalTrackingItem>(
     device: { type: String },
     browser: { type: String },
     os: { type: String },
+    location: { type: String },
     meta: { type: Schema.Types.Mixed },
     timestamp: { type: Date, default: Date.now },
   },
@@ -313,6 +410,7 @@ const CustomerPortalSchema = new Schema<ICustomerPortal>(
     lastSentBy: { type: String },
     lastViewedAt: { type: Date },
     lastViewedIp: { type: String },
+    lastViewedLocation: { type: String },
     lastViewedDevice: { type: String },
     viewCount: { type: Number, default: 0 },
     downloadCount: { type: Number, default: 0 },
@@ -329,7 +427,7 @@ const LeadSchema = new Schema<ILead>(
     source: {
       type: String,
       default: 'Website',
-      enum: ['Website', 'Contact Us', 'Referral', 'Phone', 'Ads', 'Newsletter', 'Walk-in', 'Other'],
+      enum: ['Website', 'Contact Us', 'Referral', 'Phone', 'Ads', 'Newsletter', 'Walk-in', 'Import', 'Manual', 'Other'],
     },
     origin: { type: String, required: true, trim: true },
     destination: { type: String, required: true, trim: true },
@@ -362,17 +460,22 @@ const LeadSchema = new Schema<ILead>(
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     paymentStatus: {
       type: String,
-      enum: ['Pending', 'Partial', 'Paid'],
+      enum: ['Pending', 'Authorized', 'Partial', 'Paid', 'Failed', 'Refunded'],
       default: 'Pending',
       index: true,
     },
     pnr: { type: String, trim: true },
+    ticketNumber: { type: String, trim: true },
     invoiceNumber: { type: String, trim: true },
     priceQuoted: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     nextFollowUpDate: { type: Date, index: true },
     billing: { type: BillingSchema, default: undefined },
     attachments: { type: [LeadAttachmentSchema], default: [] },
+    passengers: { type: [PassengerSchema], default: [] },
+    flightLegs: { type: [FlightLegSchema], default: [] },
+    multiCityRoutes: { type: [MultiCityRouteSchema], default: [] },
+    addOns: { type: AddOnsSchema, default: () => ({ meal: '', baggage: '', seat: '', notes: '' }) },
     customerPortal: { type: CustomerPortalSchema, default: () => ({ viewCount: 0, downloadCount: 0, history: [] }) },
     notes: [NoteSchema],
     comments: [CommentSchema],

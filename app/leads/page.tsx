@@ -18,13 +18,13 @@ import {
   User,
   Eye,
   Plus,
+  MessageSquare,
 } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { StageBadge, PaymentBadge, FollowUpBadge, Chip } from '@/components/ui/Chip';
-import { Avatar } from '@/components/ui/Avatar';
 import {
   BOOKING_TYPES,
   LEAD_STATUSES,
@@ -33,15 +33,19 @@ import {
   bookingTypeShort,
   statusTone,
 } from '@/lib/leadOptions';
+import { LeadEmailComposerModal } from '@/components/leads/LeadEmailComposerModal';
+import { useToast } from '@/context/ToastContext';
 
 function LeadsContent() {
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const initialUrgencyFilter = searchParams.get('filter') || '';
 
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [emailModalLead, setEmailModalLead] = useState<any | null>(null);
 
   // Filter States
   const [search, setSearch] = useState('');
@@ -134,9 +138,14 @@ function LeadsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      if (!res.ok) throw new Error('Update failed');
-    } catch (e) {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+      const fieldKey = Object.keys(patch)[0];
+      const val = patch[fieldKey];
+      toast.success('Lead Updated', `Updated ${fieldKey} to "${val}".`);
+    } catch (e: any) {
       console.error(e);
+      toast.error('Update Failed', e.message || 'Could not update lead');
       if (previous) {
         setLeads((prev) => prev.map((l) => (l._id === leadId ? previous : l)));
       }
@@ -276,8 +285,11 @@ function LeadsContent() {
               >
                 <option value="">All Payments</option>
                 <option value="Pending">Pending</option>
+                <option value="Authorized">Authorized</option>
                 <option value="Partial">Partial</option>
                 <option value="Paid">Paid</option>
+                <option value="Failed">Failed</option>
+                <option value="Refunded">Refunded</option>
               </select>
             </div>
 
@@ -366,36 +378,41 @@ function LeadsContent() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-ember-surface-raised border-b border-ember-border text-ember-text-secondary uppercase text-[10px] tracking-wider font-semibold">
-                  <th className="py-3 px-4">Passenger & Contact</th>
-                  <th className="py-3 px-4">Flight Route & Dates</th>
-                  <th className="py-3 px-4">Booking Type</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Stage</th>
-                  <th className="py-3 px-4">Follow-Up Urgency</th>
-                  <th className="py-3 px-4">Assigned Agent</th>
-                  <th className="py-3 px-4">Payment</th>
-                  <th className="py-3 px-4">Fare / PNR</th>
-                  <th className="py-3 px-4">💬</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                <tr className="bg-ember-surface-raised border-b-2 border-ember-border text-ember-text-primary uppercase text-[11px] tracking-wider font-bold">
+                  <th className="py-3.5 px-5">Passenger & Contact</th>
+                  <th className="py-3.5 px-5">Flight Route & Dates</th>
+                  <th className="py-3.5 px-5">Booking Type</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5">Stage</th>
+                  <th className="py-3.5 px-5">Follow-Up</th>
+                  <th className="py-3.5 px-5">Agent</th>
+                  <th className="py-3.5 px-5">Payment</th>
+                  <th className="py-3.5 px-5">Fare</th>
+                  <th className="py-3.5 px-5">PNR / Ticket</th>
+                  <th className="py-3.5 px-5 text-center" title="Notes & Comments">
+                    <div className="flex items-center justify-center gap-1">
+                      <MessageSquare className="w-3.5 h-3.5 text-ember-neutral" />
+                    </div>
+                  </th>
+                  <th className="py-3.5 px-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ember-border bg-ember-surface">
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-ember-neutral">
+                    <td colSpan={12} className="py-14 text-center text-ember-neutral">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 rounded-full border-2 border-ember-primary border-t-transparent animate-spin" />
-                        <span>Loading flight leads...</span>
+                        <span className="text-sm">Loading flight leads...</span>
                       </div>
                     </td>
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-ember-neutral">
+                    <td colSpan={12} className="py-14 text-center text-ember-neutral">
                       <Plane className="w-8 h-8 text-ember-neutral/50 mx-auto mb-2" />
                       <p className="font-semibold text-ember-text-primary">No matching flight leads found</p>
-                      <p className="text-[11px] mt-0.5">Try adjusting your filters or create a new lead.</p>
+                      <p className="text-xs mt-1">Try adjusting your filters or create a new lead.</p>
                     </td>
                   </tr>
                 ) : (
@@ -411,48 +428,75 @@ function LeadsContent() {
                     return (
                       <tr
                         key={lead._id}
-                        className="hover:bg-ember-surface-raised/60 transition-colors group"
+                        className="hover:bg-ember-surface-raised/60 transition-colors group border-b border-ember-border/50 last:border-b-0"
                       >
                         {/* Passenger */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <Link
                             href={`/leads/${lead._id}`}
-                            className="font-bold text-ember-text-primary hover:text-ember-primary group-hover:underline block"
+                            className="font-bold text-[13px] text-ember-text-primary hover:text-ember-primary group-hover:underline block leading-tight"
                           >
                             {lead.name}
                           </Link>
-                          <div className="flex items-center gap-2 text-[11px] text-ember-neutral mt-0.5">
+                          <div className="flex items-center gap-2 text-xs text-ember-text-secondary mt-1">
                             <span className="flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-ember-neutral" />
+                              <Phone className="w-3 h-3" />
                               {lead.phone}
                             </span>
-                            {lead.email && (
-                              <span className="truncate max-w-[120px]">{lead.email}</span>
-                            )}
                           </div>
+                          {lead.email && (
+                            <div className="text-xs text-ember-text-secondary mt-0.5 truncate max-w-[160px]">
+                              {lead.email}
+                            </div>
+                          )}
+                          {lead.customerPortal?.lastSentAt && (
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {lead.customerPortal?.viewCount > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                  Opened ({lead.customerPortal.viewCount})
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                  ✉️ Emailed
+                                </span>
+                              )}
+                              {lead.customerPortal?.lastViewedIp && (
+                                <span
+                                  className="text-[10px] font-mono text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200"
+                                  title={`Visitor Device: ${lead.customerPortal?.lastViewedDevice || 'Unknown'}`}
+                                >
+                                  IP: {lead.customerPortal.lastViewedIp}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Route */}
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-ember-text-primary flex items-center gap-1.5">
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-[13px] text-ember-text-primary flex items-center gap-1.5">
                             <span>{lead.origin}</span>
-                            <span className="text-ember-primary">&rarr;</span>
+                            <Plane className="w-3.5 h-3.5 text-ember-primary rotate-90" />
                             <span>{lead.destination}</span>
                           </div>
-                          <div className="text-[11px] text-ember-text-secondary mt-0.5">
-                            {travelDateFormatted} &bull; {lead.pax} {lead.pax === 1 ? 'Pax' : 'Pax'}
+                          <div className="text-xs text-ember-text-secondary mt-1">
+                            {travelDateFormatted}
+                          </div>
+                          <div className="text-xs text-ember-text-secondary">
+                            {lead.pax} Passenger{lead.pax !== 1 ? 's' : ''}
                           </div>
                         </td>
 
                         {/* Booking Type Dropdown */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <select
                             value={lead.bookingType || DEFAULT_BOOKING_TYPE}
                             onChange={(e) =>
                               handleQuickUpdate(lead._id, { bookingType: e.target.value })
                             }
                             title={lead.bookingType || DEFAULT_BOOKING_TYPE}
-                            className="max-w-[150px] bg-ember-surface border border-ember-border rounded px-2 py-1 text-xs font-semibold text-ember-text-primary focus:outline-none focus:border-ember-primary cursor-pointer"
+                            className="max-w-[150px] bg-ember-surface border border-ember-border rounded px-2 py-1.5 text-xs font-semibold text-ember-text-primary focus:outline-none focus:border-ember-primary cursor-pointer"
                           >
                             {BOOKING_TYPES.map((t) => (
                               <option key={t} value={t}>
@@ -463,13 +507,13 @@ function LeadsContent() {
                         </td>
 
                         {/* Status Dropdown */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <select
                             value={lead.status || DEFAULT_LEAD_STATUS}
                             onChange={(e) =>
                               handleQuickUpdate(lead._id, { status: e.target.value })
                             }
-                            className={`max-w-[150px] border rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-ember-primary cursor-pointer ${statusTone(
+                            className={`max-w-[150px] border rounded px-2 py-1.5 text-xs font-semibold focus:outline-none focus:border-ember-primary cursor-pointer ${statusTone(
                               lead.status || DEFAULT_LEAD_STATUS
                             )}`}
                           >
@@ -482,11 +526,11 @@ function LeadsContent() {
                         </td>
 
                         {/* Stage Dropdown */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <select
                             value={lead.stage}
                             onChange={(e) => handleQuickUpdate(lead._id, { stage: e.target.value })}
-                            className="bg-ember-surface border border-ember-border rounded px-2 py-1 text-xs font-semibold text-ember-text-primary focus:outline-none focus:border-ember-primary cursor-pointer"
+                            className="bg-ember-surface border border-ember-border rounded px-2 py-1.5 text-xs font-semibold text-ember-text-primary focus:outline-none focus:border-ember-primary cursor-pointer"
                           >
                             <option value="New">New</option>
                             <option value="Contacted">Contacted</option>
@@ -499,74 +543,105 @@ function LeadsContent() {
                         </td>
 
                         {/* Follow-up Urgency Alert */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <FollowUpBadge date={lead.nextFollowUpDate} />
                         </td>
 
                         {/* Assigned Staff */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           {lead.assignedTo ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar
-                                name={lead.assignedTo.name}
-                                src={lead.assignedTo.avatar}
-                                size="sm"
-                              />
-                              <span className="font-semibold text-ember-text-primary text-xs truncate max-w-[100px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="font-semibold text-ember-text-primary text-xs truncate max-w-[130px]">
                                 {lead.assignedTo.name}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold">
+                            <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-semibold inline-block">
                               Unassigned
                             </span>
                           )}
                         </td>
 
                         {/* Payment */}
-                        <td className="py-3 px-4">
+                        <td className="py-4 px-5">
                           <PaymentBadge status={lead.paymentStatus} size="sm" />
                         </td>
 
-                        {/* Fare / PNR */}
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-ember-text-primary">
-                            {lead.priceQuoted > 0 ? `$${lead.priceQuoted}` : '—'}
+                        {/* Fare */}
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-[13px] text-ember-text-primary">
+                            {lead.priceQuoted > 0 ? `$${lead.priceQuoted.toLocaleString()}` : '—'}
                           </div>
-                          {lead.pnr && (
-                            <span className="font-code text-[11px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                              {lead.pnr}
-                            </span>
+                        </td>
+
+                        {/* PNR / Ticket */}
+                        <td className="py-4 px-5">
+                          {lead.pnr ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold uppercase text-emerald-700">PNR</span>
+                                <span className="font-mono font-bold text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 tracking-widest">
+                                  {lead.pnr}
+                                </span>
+                              </div>
+                              {lead.ticketNumber && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-bold uppercase text-stone-500">TKT</span>
+                                  <span className="font-mono text-[11px] text-stone-700 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                                    {lead.ticketNumber}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-ember-neutral/60">—</span>
                           )}
                         </td>
 
                         {/* Comment Count */}
-                        <td className="py-3 px-4">
-                          <Link href={`/leads/${lead._id}?tab=comments`}>
+                        <td className="py-4 px-5 text-center">
+                          <Link href={`/leads/${lead._id}?tab=comments`} className="inline-block group/c">
                             {(() => {
                               const total = (lead.comments || []).reduce(
                                 (acc: number, c: any) => acc + 1 + (c.replies?.length || 0),
                                 0
                               );
                               return total > 0 ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-chip bg-ember-primary/10 text-ember-primary font-bold text-[11px] hover:bg-ember-primary/20 transition-colors">
-                                  💬 {total}
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs group-hover/c:bg-blue-100 group-hover/c:border-blue-300 transition-all shadow-xs">
+                                  <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>{total}</span>
                                 </span>
                               ) : (
-                                <span className="text-ember-neutral text-[11px]">—</span>
+                                <span className="inline-flex items-center gap-1 text-stone-300 group-hover/c:text-stone-500 text-xs transition-colors">
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span className="text-[10px]">0</span>
+                                </span>
                               );
                             })()}
                           </Link>
                         </td>
 
                         {/* Action */}
-                        <td className="py-3 px-4 text-right">
-                          <Link href={`/leads/${lead._id}`}>
-                            <Button size="sm" variant="secondary" className="px-2.5 py-1 text-xs">
-                              <Eye className="w-3.5 h-3.5 mr-1" />
-                              View
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEmailModalLead(lead)}
+                              className="px-2 py-1.5 text-xs text-ember-primary border-ember-primary/30 hover:bg-ember-primary/10"
+                              title="Email Customer"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline ml-1">Email</span>
                             </Button>
-                          </Link>
+                            <Link href={`/leads/${lead._id}`}>
+                              <Button size="sm" variant="secondary" className="px-2.5 py-1.5 text-xs">
+                                <Eye className="w-3.5 h-3.5 mr-1" />
+                                View
+                              </Button>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -577,6 +652,18 @@ function LeadsContent() {
           </div>
         </Card>
       </div>
+
+      {/* Quick Email Customer Modal */}
+      {emailModalLead && (
+        <LeadEmailComposerModal
+          isOpen={Boolean(emailModalLead)}
+          onClose={() => setEmailModalLead(null)}
+          lead={emailModalLead}
+          onEmailSent={() => {
+            fetchLeads();
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

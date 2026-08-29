@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { Lead } from '@/models/Lead';
+import { EmailTemplate } from '@/models/EmailTemplate';
 import { getAuthUser } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
 import { generateTrackingToken, buildCustomerEmailHtml } from '@/lib/tracking';
+import { buildTemplateVariables, substituteTemplateVariables } from '@/lib/templateUtils';
 import mongoose from 'mongoose';
 
 export async function POST(
@@ -29,6 +31,8 @@ export async function POST(
       useDefaultBrandedTemplate = true,
       customHtml,
       selectedAttachmentIds = [],
+      templateId,
+      templateOverrides = {},
     } = body;
 
     await connectToDatabase();
@@ -46,7 +50,8 @@ export async function POST(
       );
     }
 
-    // 1. Generate or maintain secure tracking token (Never expose Lead MongoDB ID in tracking URLs!)
+    const rawCustomHtml = customHtml || body.html;
+
     if (!lead.customerPortal) {
       lead.customerPortal = {
         trackingToken: generateTrackingToken(),
@@ -58,8 +63,18 @@ export async function POST(
       lead.customerPortal.trackingToken = generateTrackingToken();
     }
 
-    const trackingToken = lead.customerPortal.trackingToken;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const trackingToken: string = lead.customerPortal.trackingToken || generateTrackingToken();
+    lead.customerPortal.trackingToken = trackingToken;
+
+    // Detect base URL from request host or env
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const isLocalhost = host?.includes('localhost') || host?.includes('127.0.0.1');
+    const proto = req.headers.get('x-forwarded-proto') || (isLocalhost ? 'http' : 'http');
+    const defaultLiveUrl = (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost'))
+      ? process.env.NEXT_PUBLIC_APP_URL
+      : 'http://crm.airlinesconsolidator.com';
+    const detectedBaseUrl = (host && !isLocalhost) ? `${proto}://${host}` : defaultLiveUrl;
+    const baseUrl = detectedBaseUrl.replace(/\/+$/, '');
 
     // 2. Select attachments to include
     const allAttachments = lead.attachments || [];
@@ -72,7 +87,37 @@ export async function POST(
     let finalHtml = '';
     let emailSubject = subject;
 
-    if (useDefaultBrandedTemplate || !customHtml) {
+    const portalUrl = `${baseUrl}/portal/${trackingToken}`;
+    const authUrl = `${baseUrl}/api/portal/${trackingToken}/authorize`;
+
+    if (templateId) {
+      // --- Stored template with variable substitution ---
+      if (!mongoose.Types.ObjectId.isValid(templateId)) {
+        return NextResponse.json({ error: 'Invalid templateId' }, { status: 400 });
+      }
+      const template = await EmailTemplate.findById(templateId);
+      if (!template) {
+        return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+      }
+
+      const vars = buildTemplateVariables(
+        lead,
+        user.name,
+        user.email,
+        user.phone,
+        undefined,
+        undefined,
+        portalUrl,
+        undefined,
+        authUrl
+      );
+
+      // Allow the caller to override specific variables (e.g. flight details)
+      const mergedVars = { ...vars, ...templateOverrides };
+
+      finalHtml = substituteTemplateVariables(template.bodyHtml, mergedVars);
+      emailSubject = subject || substituteTemplateVariables(template.subject, mergedVars);
+    } else if (useDefaultBrandedTemplate || !rawCustomHtml) {
       const emailBuild = buildCustomerEmailHtml({
         lead,
         trackingToken,
@@ -84,10 +129,40 @@ export async function POST(
       });
       finalHtml = emailBuild.html;
       if (!emailSubject) {
-        emailSubject = `Flight Itinerary & Booking Details &bull; ${lead.origin} &rarr; ${lead.destination} (Ref: ${lead.pnr || lead.invoiceNumber || 'PENDING'})`;
+        emailSubject = `Flight Itinerary & Booking Details • ${lead.origin} → ${lead.destination} (Ref: ${lead.pnr || lead.invoiceNumber || 'PENDING'})`;
       }
     } else {
-      finalHtml = customHtml;
+      finalHtml = rawCustomHtml;
+      // Safeguard: replace any template variables or placeholder links in rawCustomHtml
+      const vars = buildTemplateVariables(
+        lead,
+        user.name,
+        user.email,
+        user.phone,
+        undefined,
+        undefined,
+        portalUrl,
+        undefined,
+        authUrl
+      );
+      finalHtml = substituteTemplateVariables(finalHtml, vars);
+
+      // Replace any href="#" or placeholder link targets for portal or authorization
+      finalHtml = finalHtml
+        .replace(/href=["']#["']/g, `href="${portalUrl}"`)
+        .replace(/href=["'](?:https?:\/\/[^"']*)?\/portal\/[^"']*["']/g, `href="${portalUrl}"`)
+        .replace(/href=["'](?:https?:\/\/[^"']*)?\/api\/portal\/[^"']*\/authorize["']/g, `href="${authUrl}"`);
+    }
+
+    // Always attach tracking pixel for open rate tracking
+    const pixelUrl = `${baseUrl}/api/track/pixel/${trackingToken}?token=${trackingToken}`;
+    const pixelTag = `<img src="${pixelUrl}" width="1" height="1" style="display:none;width:1px;height:1px;border:0;outline:none;" alt="" />`;
+    if (!finalHtml.includes('/api/track/pixel/')) {
+      if (finalHtml.includes('</body>')) {
+        finalHtml = finalHtml.replace('</body>', `${pixelTag}</body>`);
+      } else {
+        finalHtml += pixelTag;
+      }
     }
 
     // 4. Dispatch email with attachments
@@ -105,17 +180,17 @@ export async function POST(
       );
     }
 
-    // 5. Update Customer Portal tracking state
+    // 5. Update Customer Portal tracking state and persist to MongoDB
     const now = new Date();
-    lead.customerPortal.lastSentAt = now;
-    lead.customerPortal.lastSentTo = recipientEmail;
-    lead.customerPortal.lastSentSubject = emailSubject;
-    lead.customerPortal.lastSentBy = user.name;
-
     const eventId = `portal_ev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    lead.customerPortal.history.push({
+    
+    const existingHistory = Array.isArray(lead.customerPortal?.history)
+      ? lead.customerPortal.history
+      : [];
+
+    const newHistoryEvent = {
       id: eventId,
-      event: 'email_sent',
+      event: 'email_sent' as const,
       description: `E-Ticket & Itinerary email dispatched to ${recipientEmail} by ${user.name}`,
       meta: {
         subject: emailSubject,
@@ -123,10 +198,23 @@ export async function POST(
         trackingToken,
       },
       timestamp: now,
-    });
+    };
 
-    // 6. Log in main timeline
-    lead.activityLog.push({
+    const portalPayload = {
+      trackingToken,
+      lastSentAt: now,
+      lastSentTo: recipientEmail,
+      lastSentSubject: emailSubject,
+      lastSentBy: user.name,
+      lastViewedAt: lead.customerPortal?.lastViewedAt,
+      lastViewedIp: lead.customerPortal?.lastViewedIp,
+      lastViewedDevice: lead.customerPortal?.lastViewedDevice,
+      viewCount: lead.customerPortal?.viewCount || 0,
+      downloadCount: lead.customerPortal?.downloadCount || 0,
+      history: [...existingHistory, newHistoryEvent],
+    };
+
+    const activityItem = {
       id: `act_mail_${Date.now()}`,
       type: 'email_sent',
       description: `Customer email sent to ${recipientEmail} ("${emailSubject}") with ${attachmentsToInclude.length} ticket attachments by ${user.name}`,
@@ -138,22 +226,32 @@ export async function POST(
         to: recipientEmail,
         attachmentsCount: attachmentsToInclude.length,
       },
-    });
+    };
 
-    // Advance stage to Contacted if New
-    if (lead.stage === 'New') {
-      lead.stage = 'Contacted';
-    }
+    const newStage = lead.stage === 'New' ? 'Contacted' : lead.stage;
 
-    await lead.save();
+    // Direct findByIdAndUpdate guarantees MongoDB writes the trackingToken and history
+    const updatedLead = await Lead.findByIdAndUpdate(
+      lead._id,
+      {
+        $set: {
+          customerPortal: portalPayload,
+          stage: newStage,
+        },
+        $push: {
+          activityLog: activityItem,
+        },
+      },
+      { new: true }
+    ).populate('assignedTo', 'name email avatar role phone');
 
     return NextResponse.json({
       success: true,
       messageId: result.messageId,
       trackingToken,
-      trackingUrl: `${baseUrl.replace(/\/+$/, '')}/portal/${trackingToken}`,
+      trackingUrl: `${baseUrl}/portal/${trackingToken}`,
       message: 'Email with tickets and tracking link dispatched successfully!',
-      lead,
+      lead: updatedLead || lead,
     });
   } catch (error: any) {
     console.error('[Lead Email Error]:', error);

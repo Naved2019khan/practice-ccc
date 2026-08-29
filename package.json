@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node --max-old-space-size=2048 ./node_modules/next/dist/bin/next build",
+    "build:low-mem": "node --max-old-space-size=1024 ./node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx --tsconfig tsconfig.json scripts/seed.ts",
-    "seed:force": "tsx --tsconfig tsconfig.json scripts/seed.ts --force"
+    "seed:force": "tsx --tsconfig tsconfig.json scripts/seed.ts --force",
+    "seed:template": "tsx --tsconfig tsconfig.json scripts/seed-booking-template.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1116.0",

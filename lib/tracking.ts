@@ -70,9 +70,60 @@ export function generateTrackingToken(): string {
 export function getClientIp(req: NextRequest): string {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    const firstIp = forwarded.split(',')[0].trim();
+    if (firstIp === '::1' || firstIp === '::ffff:127.0.0.1') return '127.0.0.1 (Localhost)';
+    return firstIp;
   }
-  return req.headers.get('x-real-ip') || '127.0.0.1';
+  const realIp =
+    req.headers.get('cf-connecting-ip') ||
+    req.headers.get('x-real-ip') ||
+    req.headers.get('x-client-ip') ||
+    req.headers.get('fastly-client-ip');
+  if (realIp) {
+    const trimmed = realIp.trim();
+    if (trimmed === '::1' || trimmed === '::ffff:127.0.0.1') return '127.0.0.1 (Localhost)';
+    return trimmed;
+  }
+  return '127.0.0.1 (Localhost)';
+}
+
+/**
+ * Resolves an IP address to a human-readable location (City, Region, Country).
+ * Uses ip-api.com (free, reliable server-side geo resolution).
+ */
+export async function resolveIpLocation(ip: string): Promise<string> {
+  if (!ip) return 'Location unavailable';
+  const cleanIp = ip.replace(/^::ffff:/, '').replace(/\s*\(Localhost\)$/i, '').trim();
+
+  // Check for private / loopback IP ranges
+  if (
+    cleanIp === '127.0.0.1' ||
+    cleanIp === '::1' ||
+    cleanIp.startsWith('127.') ||
+    cleanIp.startsWith('192.168.') ||
+    cleanIp.startsWith('10.') ||
+    cleanIp.startsWith('172.16.') ||
+    cleanIp.toLowerCase().includes('localhost')
+  ) {
+    return 'Localhost / Internal Network';
+  }
+
+  try {
+    const geoRes = await fetch(`http://ip-api.com/json/${cleanIp}?fields=status,city,regionName,country`, {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (geoRes.ok) {
+      const geo = await geoRes.json();
+      if (geo.status === 'success') {
+        const parts = [geo.city, geo.regionName, geo.country].filter(Boolean);
+        return parts.length > 0 ? parts.join(', ') : 'Unknown Location';
+      }
+    }
+  } catch (err) {
+    // Geo lookup is non-blocking fallback
+  }
+
+  return 'Location unavailable';
 }
 
 export interface CustomerEmailParams {
@@ -85,8 +136,10 @@ export interface CustomerEmailParams {
   agentEmail?: string;
   agentPhone?: string;
   attachedFiles?: Array<{
+    id?: string;
     fileName: string;
     url: string;
+    originalName?: string;
     formattedSize?: string;
   }>;
 }
@@ -98,10 +151,10 @@ export function buildCustomerEmailHtml({
   lead,
   trackingToken,
   customMessage,
-  baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  baseUrl = (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')) ? process.env.NEXT_PUBLIC_APP_URL : 'http://crm.airlinesconsolidator.com',
   agentName = 'Flight Concierge Team',
-  agentEmail = 'concierge@flightcrm.com',
-  agentPhone = '+1 (800) 555-0199',
+  agentEmail = 'concierge@airlinesconsolidator.com',
+  agentPhone = '+1 (888) 883-0727',
   attachedFiles = [],
 }: CustomerEmailParams): { html: string; trackingUrl: string } {
   const cleanBase = baseUrl.replace(/\/+$/, '');
@@ -115,7 +168,7 @@ export function buildCustomerEmailHtml({
         day: 'numeric',
         year: 'numeric',
       })
-    : 'Pending Confirmation';
+    : 'Date Flexible';
 
   const returnDateFormatted = lead.returnDate
     ? new Date(lead.returnDate).toLocaleDateString('en-US', {
@@ -130,9 +183,8 @@ export function buildCustomerEmailHtml({
     lead.priceQuoted && lead.priceQuoted > 0
       ? `${lead.currency || 'USD'} ${Number(lead.priceQuoted).toLocaleString('en-US', {
           minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
         })}`
-      : 'Quotation in Review';
+      : 'Quotation in Progress';
 
   const attachments = attachedFiles.length > 0 ? attachedFiles : lead.attachments || [];
 
@@ -175,8 +227,8 @@ export function buildCustomerEmailHtml({
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <h1 class="header-logo">EMBER FLIGHT</h1>
-      <div class="header-sub">Private & Commercial Travel Concierge</div>
+      <h1 class="header-logo">AIRLINESCONSOLIDATOR</h1>
+      <div class="header-sub">Official Flight &amp; VIP Travel Management</div>
     </div>
 
     <!-- Main Content -->
@@ -223,6 +275,14 @@ export function buildCustomerEmailHtml({
               <td style="padding: 4px 0; color: #1C1917; font-weight: 800; font-family: monospace;">${lead.pnr || 'PENDING ISSUE'}</td>
             </tr>
             ${
+              lead.ticketNumber
+                ? `<tr>
+              <td style="padding: 4px 0; color: #78716C; font-weight: 600;">Ticket Number:</td>
+              <td style="padding: 4px 0; color: #1C1917; font-weight: 800; font-family: monospace;">${lead.ticketNumber}</td>
+            </tr>`
+                : ''
+            }
+            ${
               lead.invoiceNumber
                 ? `<tr>
               <td style="padding: 4px 0; color: #78716C; font-weight: 600;">Invoice Number:</td>
@@ -232,7 +292,7 @@ export function buildCustomerEmailHtml({
             }
             <tr>
               <td style="padding: 4px 0; color: #78716C; font-weight: 600;">Booking Status:</td>
-              <td style="padding: 4px 0; color: #16A34A; font-weight: 700;">${lead.stage || 'Active'} &bull; ${lead.paymentStatus || 'Pending'}</td>
+              <td style="padding: 4px 0; color: #16A34A; font-weight: 700;">${lead.bookingType || 'Flight'} &bull; ${lead.stage || 'Active'} &bull; ${lead.paymentStatus || 'Pending'}</td>
             </tr>
           </table>
         </div>
@@ -244,30 +304,35 @@ export function buildCustomerEmailHtml({
         <div class="price-amount">${priceFormatted}</div>
       </div>
 
-      <!-- Attached Tickets List (if any) -->
+      <!-- Attached Tickets List (with direct tracked download links) -->
       ${
         attachments.length > 0
           ? `
       <div class="attachments-section">
         <div style="font-size: 12px; font-weight: 700; color: #1C1917; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-          📎 Attached E-Tickets & Documents (${attachments.length})
+          📎 Attached E-Tickets & Boarding Documents (${attachments.length})
         </div>
         ${attachments
-          .map(
-            (file: any) => `
-        <table style="width: 100%; background: #FFFFFF; border: 1px solid #D6D3D1; border-radius: 6px; padding: 8px 12px; margin-top: 6px;">
+          .map((file: any) => {
+            const ticketDownloadUrl = file.id
+              ? `${cleanBase}/api/portal/${trackingToken}/download?attachmentId=${file.id}`
+              : trackingUrl;
+            return `
+        <table style="width: 100%; background: #FFFFFF; border: 1px solid #D6D3D1; border-radius: 6px; padding: 10px 14px; margin-top: 8px;">
           <tr>
             <td style="font-size: 13px; font-weight: 700; color: #1C1917;">
               📄 ${file.originalName || file.fileName}
               <span style="font-size: 11px; color: #78716C; font-weight: normal; margin-left: 6px;">(${file.formattedSize || 'Attached'})</span>
             </td>
             <td style="text-align: right;">
-              <a href="${trackingUrl}" style="font-size: 12px; font-weight: 700; color: #C2410C; text-decoration: none;">View & Download &rarr;</a>
+              <a href="${ticketDownloadUrl}" style="display: inline-block; background: #C2410C; color: #FFFFFF !important; font-size: 11px; font-weight: 700; text-decoration: none; padding: 6px 12px; border-radius: 4px;">
+                Download E-Ticket &darr;
+              </a>
             </td>
           </tr>
         </table>
-        `
-          )
+        `;
+          })
           .join('')}
       </div>
       `
@@ -291,7 +356,7 @@ export function buildCustomerEmailHtml({
         Assigned Specialist: <strong>${agentName}</strong> (${agentEmail})
       </p>
       <p style="margin: 0; font-size: 11px; color: #A8A29E;">
-        &copy; ${new Date().getFullYear()} Ember Flight Concierge. All rights reserved. &bull; 24/7 VIP Travel Support
+        &copy; ${new Date().getFullYear()} AirlinesConsolidator. All rights reserved. &bull; 24/7 VIP Travel Support
       </p>
     </div>
   </div>

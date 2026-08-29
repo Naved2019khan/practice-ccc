@@ -47,6 +47,11 @@ export async function getAuthUser(req: NextRequest): Promise<(IUser & { _id: any
       }
     }
 
+    // 3. Fallback to x-auth-token header
+    if (!token) {
+      token = req.headers.get('x-auth-token') || undefined;
+    }
+
     if (!token) return null;
 
     const payload = verifyToken(token);

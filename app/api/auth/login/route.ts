@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
+      token,
       user: {
         userId: user._id.toString(),
         name: user.name,
@@ -59,12 +60,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Detect if connection is HTTPS (or behind SSL reverse proxy)
+    const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol;
+    const isHttps = proto === 'https' || proto === 'https:';
+
     // Set HttpOnly cookie
     response.cookies.set({
       name: 'auth_token',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days

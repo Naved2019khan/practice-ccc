@@ -87,7 +87,7 @@ export const COUNTRIES: Country[] = [
   { code: 'MX', name: 'Mexico', dial: '+52', flag: '🇲🇽' },
 ];
 
-export const DEFAULT_COUNTRY_CODE = 'US';
+export const DEFAULT_COUNTRY_CODE = 'IN';
 
 const byCode = new Map(COUNTRIES.map((c) => [c.code, c]));
 

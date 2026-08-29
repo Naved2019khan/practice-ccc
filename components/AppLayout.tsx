@@ -61,7 +61,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, onSearchChange }
       <div className="min-h-screen bg-ember-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-ember-primary border-t-transparent animate-spin" />
-          <p className="text-xs font-semibold text-ember-neutral">Loading Ember CRM...</p>
+          <p className="text-xs font-semibold text-ember-neutral">Loading AirlinesConsolidator CRM...</p>
         </div>
       </div>
     );
@@ -73,6 +73,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children, onSearchChange }
 
       <div className="flex-1 flex flex-col min-w-0">
         <Navbar
+          user={user}
           onSearchChange={onSearchChange}
           onNewLeadClick={() => setIsNewLeadDrawerOpen(true)}
         />
