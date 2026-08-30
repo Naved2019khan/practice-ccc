@@ -5,7 +5,6 @@ import {
   FileText,
   Plus,
   Edit2,
-  Trash2,
   Eye,
   Copy,
   Check,
@@ -176,7 +175,7 @@ export default function TemplatesPage() {
   <div style="background: #F5F5F4; padding: 16px; border-radius: 8px; margin: 16px 0;">
     <p style="margin: 4px 0;"><strong>Flight:</strong> {{flight1_airline}} {{flight1_number}}</p>
     <p style="margin: 4px 0;"><strong>Passengers:</strong> {{pax}}</p>
-    <p style="margin: 4px 0;"><strong>Total Quoted Fare:</strong> \${{price}} {{currency}}</p>
+    <p style="margin: 4px 0;"><strong>Total Quoted Fare:</strong> {{currency}} {{price}}</p>
     <p style="margin: 4px 0;"><strong>Booking Ref:</strong> {{booking_reference}}</p>
   </div>
   <p>Best regards,<br><strong>{{agent_name}}</strong><br>{{company_name}}</p>
@@ -287,16 +286,9 @@ export default function TemplatesPage() {
                   <button
                     onClick={() => handleOpenEdit(tmpl)}
                     className="p-1.5 rounded text-ember-neutral hover:text-ember-text-primary hover:bg-ember-surface-raised"
-                    title="Edit"
+                    title="Edit Template"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteTemplate(tmpl._id)}
-                    className="p-1.5 rounded text-ember-neutral hover:text-ember-error hover:bg-ember-surface-raised"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

@@ -28,6 +28,8 @@ import { PhoneField } from '@/components/ui/PhoneField';
 import { CardNumberInput } from '@/components/ui/CardNumberInput';
 import { AirportInput } from '@/components/ui/AirportInput';
 import { COUNTRIES, DEFAULT_COUNTRY_CODE, getCountry, getDialCode } from '@/lib/countries';
+import { PNRConverterBox } from '@/components/leads/PNRConverterBox';
+import { type ParsePNRResult } from '@/lib/pnr';
 import {
   BOOKING_TYPES,
   DEFAULT_BOOKING_TYPE,
@@ -245,11 +247,30 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
 }) => {
   const { toast } = useToast();
   const [form, setForm] = useState<LeadFormValues>(EMPTY_FORM);
+  const [flightEntryMode, setFlightEntryMode] = useState<'pnr' | 'manual'>('pnr');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  const handlePNRParsed = useCallback((result: ParsePNRResult) => {
+    const { crmData } = result;
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name && prev.name.trim() !== '' ? prev.name : crmData.name,
+      pax: crmData.pax,
+      passengers: crmData.passengers,
+      flightLegs: crmData.flightLegs,
+      origin: crmData.origin || prev.origin,
+      destination: crmData.destination || prev.destination,
+      travelDate: crmData.travelDate || prev.travelDate,
+      returnDate: crmData.returnDate ?? (crmData.tripType === 'One Way' ? '' : prev.returnDate),
+      tripType: crmData.tripType,
+      multiCityRoutes: crmData.multiCityRoutes,
+    }));
+    toast.success('PNR Converted', `Populated ${crmData.flightLegs.length} flight leg(s) & ${crmData.pax} passenger(s)`);
+  }, [toast]);
 
   // Keyed by the same dotted paths `validateLeadForm` reports, so a failed
   // submit can focus the offending control.
@@ -334,6 +355,7 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
         returnDate: form.tripType === 'One Way' ? undefined : form.returnDate || undefined,
         pax: form.pax,
         passengers: form.passengers,
+        flightLegs: form.flightLegs,
         multiCityRoutes: form.multiCityRoutes,
         tripType: form.tripType,
         bookingType: form.bookingType,
@@ -465,7 +487,19 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
               placeholder="e.g. John Doe"
               autoComplete="name"
               value={String(form.name ?? '')}
-              onChange={(e) => setField('name', lettersAndSpacesOnly(e.target.value))}
+              onChange={(e) => {
+                const newName = lettersAndSpacesOnly(e.target.value);
+                const parts = newName.trim().split(/\s+/);
+                const first = parts[0] || '';
+                const last = parts.slice(1).join(' ') || '';
+                const updatedPax = [...(form.passengers || [])];
+                if (updatedPax.length === 0) {
+                  updatedPax.push({ id: `pax_${Date.now()}_0`, firstName: first, lastName: last, dob: '', gender: '' });
+                } else {
+                  updatedPax[0] = { ...updatedPax[0], firstName: first, lastName: last };
+                }
+                setForm((f) => ({ ...f, name: newName, passengers: updatedPax }));
+              }}
               onBlur={blur('name')}
               error={errorFor('name')}
             />
@@ -515,9 +549,16 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
         {/* --------------------------------------------- Flight Details */}
         <FormSection
           title="Flight Details"
-          description="Route, dates and where this lead sits in the pipeline."
+          description="Route, dates and itinerary requirements."
           icon={<Plane className="w-3.5 h-3.5" />}
         >
+          {/* PNR Converter Switch Box */}
+          <PNRConverterBox
+            mode={flightEntryMode}
+            onModeChange={setFlightEntryMode}
+            onParsed={handlePNRParsed}
+          />
+
           <FormRow cols={3}>
             <Select
               label="Trip Type"
@@ -885,12 +926,18 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
                             placeholder={idx === 0 ? (form.name?.split(' ')[0] || 'First name') : `First name`}
                             value={p.firstName ?? ''}
                             onChange={(e) => {
+                              const cleanVal = lettersAndSpacesOnly(e.target.value);
                               const updated = [...(form.passengers || [])];
                               while (updated.length <= idx) {
-                                updated.push({ firstName: '', lastName: '', dob: '', gender: '' });
+                                updated.push({ id: `pax_${Date.now()}_${updated.length}`, firstName: '', lastName: '', dob: '', gender: '' });
                               }
-                              updated[idx] = { ...updated[idx], firstName: lettersAndSpacesOnly(e.target.value) };
-                              setForm((f) => ({ ...f, passengers: updated }));
+                              updated[idx] = { ...updated[idx], firstName: cleanVal };
+                              if (idx === 0) {
+                                const newFullName = [cleanVal, updated[0].lastName].filter(Boolean).join(' ');
+                                setForm((f) => ({ ...f, name: newFullName, passengers: updated }));
+                              } else {
+                                setForm((f) => ({ ...f, passengers: updated }));
+                              }
                             }}
                             className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
                           />
@@ -902,12 +949,18 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
                             placeholder={idx === 0 ? (form.name?.split(' ').slice(1).join(' ') || 'Last name') : `Last name`}
                             value={p.lastName ?? ''}
                             onChange={(e) => {
+                              const cleanVal = lettersAndSpacesOnly(e.target.value);
                               const updated = [...(form.passengers || [])];
                               while (updated.length <= idx) {
-                                updated.push({ firstName: '', lastName: '', dob: '', gender: '' });
+                                updated.push({ id: `pax_${Date.now()}_${updated.length}`, firstName: '', lastName: '', dob: '', gender: '' });
                               }
-                              updated[idx] = { ...updated[idx], lastName: lettersAndSpacesOnly(e.target.value) };
-                              setForm((f) => ({ ...f, passengers: updated }));
+                              updated[idx] = { ...updated[idx], lastName: cleanVal };
+                              if (idx === 0) {
+                                const newFullName = [updated[0].firstName, cleanVal].filter(Boolean).join(' ');
+                                setForm((f) => ({ ...f, name: newFullName, passengers: updated }));
+                              } else {
+                                setForm((f) => ({ ...f, passengers: updated }));
+                              }
                             }}
                             className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
                           />
@@ -1038,7 +1091,7 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
           </FormRow>
 
           <Textarea
-            label="Initial Flight Note / Request"
+            label="Remark"
             labelHint="Optional"
             placeholder="e.g. Prefers direct flight, premium economy, flexible on +/- 2 days."
             rows={2}

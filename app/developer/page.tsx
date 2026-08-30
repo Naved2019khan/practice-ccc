@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, notFound } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { DeveloperHeader } from '@/components/dev/DeveloperHeader';
 import { S3Manager } from '@/components/dev/S3Manager';
 import { SmtpTester } from '@/components/dev/SmtpTester';
 
 function DeveloperToolsContent() {
+  if (process.env.NODE_ENV === 'production') {
+    notFound();
+  }
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState<'s3' | 'email'>(

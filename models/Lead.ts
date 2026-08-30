@@ -189,6 +189,7 @@ export interface ILead extends Document {
   pnr?: string;
   ticketNumber?: string;
   invoiceNumber?: string;
+  referenceNumber?: string;
   priceQuoted?: number;
   currency: string;
   nextFollowUpDate?: Date;
@@ -198,6 +199,8 @@ export interface ILead extends Document {
   flightLegs: IFlightLeg[];
   multiCityRoutes?: IMultiCityRoute[];
   addOns?: IAddOns;
+  remarks?: string;
+  initialNote?: string;
   customerPortal?: ICustomerPortal;
   notes: INote[];
   comments: IComment[];
@@ -467,6 +470,7 @@ const LeadSchema = new Schema<ILead>(
     pnr: { type: String, trim: true },
     ticketNumber: { type: String, trim: true },
     invoiceNumber: { type: String, trim: true },
+    referenceNumber: { type: String, trim: true, index: true },
     priceQuoted: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     nextFollowUpDate: { type: Date, index: true },
@@ -476,6 +480,8 @@ const LeadSchema = new Schema<ILead>(
     flightLegs: { type: [FlightLegSchema], default: [] },
     multiCityRoutes: { type: [MultiCityRouteSchema], default: [] },
     addOns: { type: AddOnsSchema, default: () => ({ meal: '', baggage: '', seat: '', notes: '' }) },
+    remarks: { type: String, trim: true },
+    initialNote: { type: String, trim: true },
     customerPortal: { type: CustomerPortalSchema, default: () => ({ viewCount: 0, downloadCount: 0, history: [] }) },
     notes: [NoteSchema],
     comments: [CommentSchema],
@@ -484,6 +490,18 @@ const LeadSchema = new Schema<ILead>(
   },
   { timestamps: true }
 );
+
+// Auto-generate referenceNumber and invoiceNumber if not provided
+LeadSchema.pre('save', function (next) {
+  if (!this.referenceNumber) {
+    const shortId = this._id ? this._id.toString().slice(-6).toUpperCase() : Math.random().toString(36).substring(2, 8).toUpperCase();
+    this.referenceNumber = this.invoiceNumber || `AC-${shortId}`;
+  }
+  if (!this.invoiceNumber) {
+    this.invoiceNumber = this.referenceNumber;
+  }
+  next();
+});
 
 export const Lead: Model<ILead> =
   mongoose.models.Lead || mongoose.model<ILead>('Lead', LeadSchema);

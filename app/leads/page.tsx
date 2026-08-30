@@ -205,7 +205,7 @@ function LeadsContent() {
             <div className="col-span-2 md:col-span-1">
               <input
                 type="text"
-                placeholder="Search leads..."
+                placeholder="Search by Ref #, PNR, name, phone, email, route..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-ember-surface-raised border border-ember-border rounded-input px-3 py-1.5 text-xs text-ember-text-primary placeholder:text-ember-neutral focus:outline-none focus:border-ember-primary"
@@ -379,6 +379,7 @@ function LeadsContent() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-ember-surface-raised border-b-2 border-ember-border text-ember-text-primary uppercase text-[11px] tracking-wider font-bold">
+                  <th className="py-3.5 px-5">Ref #</th>
                   <th className="py-3.5 px-5">Passenger & Contact</th>
                   <th className="py-3.5 px-5">Flight Route & Dates</th>
                   <th className="py-3.5 px-5">Booking Type</th>
@@ -400,7 +401,7 @@ function LeadsContent() {
               <tbody className="divide-y divide-ember-border bg-ember-surface">
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="py-14 text-center text-ember-neutral">
+                    <td colSpan={13} className="py-14 text-center text-ember-neutral">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 rounded-full border-2 border-ember-primary border-t-transparent animate-spin" />
                         <span className="text-sm">Loading flight leads...</span>
@@ -409,7 +410,7 @@ function LeadsContent() {
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-14 text-center text-ember-neutral">
+                    <td colSpan={13} className="py-14 text-center text-ember-neutral">
                       <Plane className="w-8 h-8 text-ember-neutral/50 mx-auto mb-2" />
                       <p className="font-semibold text-ember-text-primary">No matching flight leads found</p>
                       <p className="text-xs mt-1">Try adjusting your filters or create a new lead.</p>
@@ -425,11 +426,28 @@ function LeadsContent() {
                         })
                       : 'Date Flexible';
 
+                    const refNo =
+                      lead.referenceNumber ||
+                      lead.invoiceNumber ||
+                      lead.pnr ||
+                      `AC-${lead._id?.toString().slice(-6).toUpperCase()}`;
+
                     return (
                       <tr
                         key={lead._id}
                         className="hover:bg-ember-surface-raised/60 transition-colors group border-b border-ember-border/50 last:border-b-0"
                       >
+                        {/* Reference Number */}
+                        <td className="py-4 px-5 whitespace-nowrap">
+                          <Link
+                            href={`/leads/${lead._id}`}
+                            className="inline-flex items-center gap-1 font-mono font-bold text-xs text-ember-primary hover:text-ember-primary-hover bg-ember-surface-raised px-2.5 py-1 rounded border border-ember-border/80 hover:border-ember-primary transition-all shadow-xs"
+                            title={`View lead ${refNo}`}
+                          >
+                            <span>{refNo}</span>
+                          </Link>
+                        </td>
+
                         {/* Passenger */}
                         <td className="py-4 px-5">
                           <Link

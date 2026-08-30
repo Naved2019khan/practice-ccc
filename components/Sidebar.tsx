@@ -123,54 +123,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </Link>
           );
         })}
-
-        {/* Developer / Dev Mode Section (Admin only) */}
-        {user?.role === 'admin' && (
-          <>
-            <div className="pt-5 px-3 py-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-ember-neutral">
-                Developer Tools
-              </span>
-              <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
-                Dev
-              </span>
-            </div>
-
-            <Link
-              href="/developer/s3"
-              className={`group flex items-center justify-between px-3.5 py-2 rounded-btn text-xs font-semibold transition-all relative ${
-                pathname.startsWith('/developer/s3') || (pathname === '/developer' && !pathname.includes('email'))
-                  ? 'bg-ember-surface-raised text-ember-primary'
-                  : 'text-ember-text-secondary hover:text-ember-text-primary hover:bg-ember-surface'
-              }`}
-            >
-              {(pathname.startsWith('/developer/s3') || (pathname === '/developer' && !pathname.includes('email'))) && (
-                <span className="absolute left-0 top-1 bottom-1 w-1 bg-ember-primary rounded-r" />
-              )}
-              <div className="flex items-center gap-2.5">
-                <ImageIcon className="w-3.5 h-3.5 text-ember-neutral group-hover:text-ember-text-primary transition-colors" />
-                <span>S3 Image Manager</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/developer/email"
-              className={`group flex items-center justify-between px-3.5 py-2 rounded-btn text-xs font-semibold transition-all relative ${
-                pathname.startsWith('/developer/email')
-                  ? 'bg-ember-surface-raised text-ember-primary'
-                  : 'text-ember-text-secondary hover:text-ember-text-primary hover:bg-ember-surface'
-              }`}
-            >
-              {pathname.startsWith('/developer/email') && (
-                <span className="absolute left-0 top-1 bottom-1 w-1 bg-ember-primary rounded-r" />
-              )}
-              <div className="flex items-center gap-2.5">
-                <Mail className="w-3.5 h-3.5 text-ember-neutral group-hover:text-ember-text-primary transition-colors" />
-                <span>Email / SMTP Tester</span>
-              </div>
-            </Link>
-          </>
-        )}
       </nav>
 
       {/* User Footer Profile */}

@@ -85,35 +85,45 @@ Booking Confirmation & Payment Authorization Agreement — Ref {{booking_referen
   <tr>
     <td style="padding:28px 32px 10px 32px;">
 
-      <!-- Traveler & Contact Details -->
+      <!-- Passenger Details -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
         <tr>
           <td style="border-left:4px solid #FFC107; padding-left:10px;">
-            <h2 style="font-size:14px; color:#0B3C8A; text-transform:uppercase; letter-spacing:0.6px; margin:0 0 10px 0;">Traveler &amp; Contact Details</h2>
+            <h2 style="font-size:14px; color:#0B3C8A; text-transform:uppercase; letter-spacing:0.6px; margin:0 0 10px 0;">Passenger Details</h2>
           </td>
         </tr>
       </table>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom:24px;">
         <tr style="background-color:#F3F7FF;">
           <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">Passenger Name</td>
+          <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">Date of Birth (DOB)</td>
           <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">Gender</td>
-          <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">Phone</td>
-          <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">Email</td>
+          <td style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; border:1px solid #E2ECFB;">PNR / Reference</td>
         </tr>
         {{passengers_rows_html}}
       </table>
 
-      <!-- Itinerary Details -->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;">
+      <!-- Primary Contact Details -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
         <tr>
           <td style="border-left:4px solid #FFC107; padding-left:10px;">
-            <h2 style="font-size:14px; color:#0B3C8A; text-transform:uppercase; letter-spacing:0.6px; margin:0 0 6px 0;">Itinerary Details</h2>
+            <h2 style="font-size:14px; color:#0B3C8A; text-transform:uppercase; letter-spacing:0.6px; margin:0 0 10px 0;">Primary Contact Details</h2>
           </td>
         </tr>
       </table>
-      <p style="font-size:12.5px; color:#5c6b85; margin:0 0 14px 0; line-height:1.5;">Please review the itinerary below carefully. It is the traveler's responsibility to confirm that all names, dates, and flight details are correct before authorizing payment.</p>
+      {{contact_details_html}}
 
-      <!-- Dynamic Itinerary Flight Legs -->
+      <!-- Flight Itinerary Details (PNR Converter View) -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;">
+        <tr>
+          <td style="border-left:4px solid #FFC107; padding-left:10px;">
+            <h2 style="font-size:14px; color:#0B3C8A; text-transform:uppercase; letter-spacing:0.6px; margin:0 0 6px 0;">Flight Itinerary Details</h2>
+          </td>
+        </tr>
+      </table>
+      <p style="font-size:12.5px; color:#5c6b85; margin:0 0 14px 0; line-height:1.5;">Please review the flight itinerary below carefully. It is the traveler's responsibility to confirm that all names, dates, times, and routes are correct before authorizing payment.</p>
+
+      <!-- Dynamic Itinerary Flight Legs (PNR Converter Cards) -->
       {{itinerary_legs_html}}
 
       <!-- Total Cost Summary -->
@@ -123,7 +133,7 @@ Booking Confirmation & Payment Authorization Agreement — Ref {{booking_referen
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="font-size:13px; font-weight:700; color:#5a4300; text-transform:uppercase; letter-spacing:0.5px;">Total Booking Amount</td>
-                <td align="right" style="font-size:22px; font-weight:800; color:#0B3C8A;">{{currency}} ${{price}}</td>
+                <td align="right" style="font-size:22px; font-weight:800; color:#0B3C8A;">{{currency}} {{price}}</td>
               </tr>
             </table>
             <p style="font-size:11.5px; color:#5a4300; margin:8px 0 0 0; line-height:1.5;">Charges may be split across two or more transactions for accounting or supplier purposes; the combined total will not exceed the amount authorized above.</p>
@@ -164,7 +174,7 @@ Booking Confirmation & Payment Authorization Agreement — Ref {{booking_referen
               <tr>
                 <td style="padding:24px 28px;">
                   <p style="font-size:13.5px; color:#1a2b4c; font-weight:600; line-height:1.6; margin:0 0 18px 0;">
-                    To complete and secure your flight booking, please click the button below to authorize payment of <strong style="color:#0B3C8A; font-size:15px;">{{currency}} ${{price}}</strong>. By clicking, you confirm that you have reviewed the itinerary above, including all passenger names, flight details, dates, and total amount, and you agree to the terms stated in this document.
+                    To complete and secure your flight booking, please click the button below to authorize payment of <strong style="color:#0B3C8A; font-size:15px;">{{currency}} {{price}}</strong>. By clicking, you confirm that you have reviewed the itinerary above, including all passenger names, flight details, dates, and total amount, and you agree to the terms stated in this document.
                   </p>
                   <!-- Extra Large High-Visibility Authorization CTA Button -->
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 18px 0 16px 0;">
@@ -190,7 +200,7 @@ Booking Confirmation & Payment Authorization Agreement — Ref {{booking_referen
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F8FAFF; border:1px solid #E2ECFB; border-radius:10px; margin-bottom:22px;">
         <tr>
           <td style="padding:18px 20px;">
-            <p style="font-size:13px; color:#354566; line-height:1.6; margin:0 0 12px 0;">By signing below, I, <strong>{{name}}</strong>, confirm that I have reviewed and verified the itinerary above, including all passenger names, flight details, dates, and times, and I authorize <strong>{{company_name}}</strong>, and its associated travel suppliers, to charge the total amount of <strong style="color:#0B3C8A;">{{currency}} ${{price}}</strong> to the card identified above.</p>
+            <p style="font-size:13px; color:#354566; line-height:1.6; margin:0 0 12px 0;">By signing below, I, <strong>{{name}}</strong>, confirm that I have reviewed and verified the itinerary above, including all passenger names, flight details, dates, and times, and I authorize <strong>{{company_name}}</strong>, and its associated travel suppliers, to charge the total amount of <strong style="color:#0B3C8A;">{{currency}} {{price}}</strong> to the card identified above.</p>
             <p style="font-size:13px; color:#354566; line-height:1.6; margin:0;">I understand this authorization applies only to the booking described in this document and does not authorize any future or unrelated charges.</p>
           </td>
         </tr>

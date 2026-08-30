@@ -54,6 +54,9 @@ import { useToast } from '@/context/ToastContext';
 import { buildTemplateVariables, substituteTemplateVariables } from '@/lib/templateUtils';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { lettersAndSpacesOnly } from '@/lib/validation';
+import { PNRConverterBox } from '@/components/leads/PNRConverterBox';
+import { type ParsePNRResult } from '@/lib/pnr';
+import { resolveDateTime } from '@/lib/pnr/enricher';
 import {
   BOOKING_TYPES,
   LEAD_STATUSES,
@@ -83,9 +86,29 @@ export default function LeadDetailPage() {
 
   // Edit Specs State
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
+  const [editFlightEntryMode, setEditFlightEntryMode] = useState<'pnr' | 'manual'>('pnr');
   const [editForm, setEditForm] = useState<any>({});
   const [isSavingSpecs, setIsSavingSpecs] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
+  const handleEditPNRParsed = (result: ParsePNRResult) => {
+    const { crmData } = result;
+    setEditForm((prev: any) => ({
+      ...prev,
+      name: prev.name && prev.name.trim() !== '' ? prev.name : crmData.name,
+      pax: crmData.pax,
+      passengers: crmData.passengers,
+      flightLegs: crmData.flightLegs,
+      origin: crmData.origin || prev.origin,
+      destination: crmData.destination || prev.destination,
+      travelDate: crmData.travelDate || prev.travelDate,
+      returnDate: crmData.returnDate ?? (crmData.tripType === 'One Way' ? '' : prev.returnDate),
+      tripType: crmData.tripType,
+      multiCityRoutes: crmData.multiCityRoutes,
+      pnr: crmData.pnr || prev.pnr,
+    }));
+    toast.success('PNR Converted', `Populated ${crmData.flightLegs.length} flight leg(s) & ${crmData.pax} passenger(s)`);
+  };
 
   // Note composer state
   const [newNoteText, setNewNoteText] = useState('');
@@ -164,6 +187,8 @@ export default function LeadDetailPage() {
         flightLegs: data.lead.flightLegs || [],
         multiCityRoutes: data.lead.multiCityRoutes || [],
         addOns: data.lead.addOns || { meal: '', baggage: '', seat: '', notes: '' },
+        remarks: data.lead.remarks || data.lead.initialNote || '',
+        initialNote: data.lead.initialNote || data.lead.remarks || '',
       });
 
       // Fetch templates
@@ -544,6 +569,9 @@ export default function LeadDetailPage() {
                 <h1 className="text-xl md:text-2xl font-bold font-display text-ember-text-primary">
                   {lead.name}
                 </h1>
+                <span className="inline-flex items-center gap-1 font-mono font-bold text-xs bg-ember-surface-raised text-ember-primary border border-ember-border px-2.5 py-1 rounded shadow-xs" title="Reference Number">
+                  Ref: {lead.referenceNumber || lead.invoiceNumber || lead.pnr || `AC-${lead._id?.toString().slice(-6).toUpperCase()}`}
+                </span>
                 <StageBadge stage={lead.stage} size="md" />
                 <FollowUpBadge date={lead.nextFollowUpDate} />
 
@@ -1021,6 +1049,13 @@ export default function LeadDetailPage() {
 
                   {/* ── Flight Detail ────────────────────────────────── */}
                   <div className="pt-3 border-t border-ember-border space-y-3">
+                    {/* PNR Converter Switch Box */}
+                    <PNRConverterBox
+                      mode={editFlightEntryMode}
+                      onModeChange={setEditFlightEntryMode}
+                      onParsed={handleEditPNRParsed}
+                    />
+
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Plane className="w-3.5 h-3.5 text-ember-primary" />
@@ -1522,6 +1557,20 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
 
+                  {/* Remark */}
+                  <div className="pt-3 border-t border-ember-border/60">
+                    <label className="block text-xs font-bold text-ember-text-primary mb-1">
+                      Remark
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Prefers direct flight, premium economy, flexible on +/- 2 days."
+                      value={editForm.remarks || editForm.initialNote || ''}
+                      onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value, initialNote: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface-raised border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium placeholder:text-ember-neutral"
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" size="sm" variant="ghost" onClick={() => setIsEditingSpecs(false)}>
                       Cancel
@@ -1697,6 +1746,19 @@ export default function LeadDetailPage() {
                     </div>
                   )}
 
+                  {/* ── Remark ── */}
+                  {(lead.remarks || lead.initialNote || lead.notes?.[0]?.text) && (
+                    <div className="pt-3 border-t border-ember-border space-y-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-ember-neutral" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-ember-neutral">Remark</span>
+                      </div>
+                      <div className="p-3 rounded-btn bg-amber-50/70 border border-amber-200/80 text-xs text-stone-800 leading-relaxed font-medium">
+                        {lead.remarks || lead.initialNote || lead.notes?.[0]?.text}
+                      </div>
+                    </div>
+                  )}
+
                   {/* ── Passenger Details ── */}
                   <div className="pt-3 border-t border-ember-border space-y-2">
                     <div className="flex items-center gap-2">
@@ -1848,8 +1910,8 @@ export default function LeadDetailPage() {
                                 <div className="text-[10px] uppercase tracking-wide text-ember-neutral font-semibold">Departing</div>
                                 <div className="font-bold text-ember-text-primary">{leg.departingAirport || '—'}</div>
                                 {leg.departingAt && (
-                                  <div className="text-ember-text-secondary">
-                                    {new Date(leg.departingAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                  <div className="text-ember-text-secondary text-[11px]">
+                                    {resolveDateTime(leg.departingAt).formattedDateTime}
                                   </div>
                                 )}
                               </div>
@@ -1857,8 +1919,8 @@ export default function LeadDetailPage() {
                                 <div className="text-[10px] uppercase tracking-wide text-ember-neutral font-semibold">Arriving</div>
                                 <div className="font-bold text-ember-text-primary">{leg.arrivingAirport || '—'}</div>
                                 {leg.arrivingAt && (
-                                  <div className="text-ember-text-secondary">
-                                    {new Date(leg.arrivingAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                  <div className="text-ember-text-secondary text-[11px]">
+                                    {resolveDateTime(leg.arrivingAt).formattedDateTime}
                                   </div>
                                 )}
                               </div>

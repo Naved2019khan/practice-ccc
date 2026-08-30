@@ -96,6 +96,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       flightLegs,
       multiCityRoutes,
       addOns,
+      remarks,
+      initialNote,
     } = body;
 
     // 1. Check for Reassignment (Admin only)
@@ -244,6 +246,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (priceQuoted !== undefined) lead.priceQuoted = isNaN(Number(priceQuoted)) ? 0 : Number(priceQuoted);
     if (currency !== undefined) lead.currency = currency;
     if (nextFollowUpDate !== undefined) lead.nextFollowUpDate = parseDateSafe(nextFollowUpDate);
+    if (remarks !== undefined) {
+      lead.remarks = remarks?.trim() || '';
+      lead.initialNote = remarks?.trim() || '';
+    } else if (initialNote !== undefined) {
+      lead.remarks = initialNote?.trim() || '';
+      lead.initialNote = initialNote?.trim() || '';
+    }
 
     // 7a. Passengers
     if (Array.isArray(passengers)) {

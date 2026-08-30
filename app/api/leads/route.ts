@@ -123,19 +123,29 @@ export async function GET(req: NextRequest) {
       query.stage = { $nin: ['Ticketed', 'Lost'] };
     }
 
-    // Search query across name, phone, email, origin, destination, pnr
+    // Search query across ref number, name, phone, email, origin, destination, pnr, passenger names, flight legs
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       query.$or = [
+        { referenceNumber: searchRegex },
+        { invoiceNumber: searchRegex },
+        { pnr: searchRegex },
+        { ticketNumber: searchRegex },
         { name: searchRegex },
         { phone: searchRegex },
         { email: searchRegex },
         { origin: searchRegex },
         { destination: searchRegex },
-        { pnr: searchRegex },
-        { ticketNumber: searchRegex },
-        { invoiceNumber: searchRegex },
+        { 'passengers.firstName': searchRegex },
+        { 'passengers.lastName': searchRegex },
+        { 'flightLegs.carrier': searchRegex },
+        { 'flightLegs.flightNumber': searchRegex },
       ];
+
+      // Handle ObjectId direct match if 24 hex characters
+      if (/^[0-9a-fA-F]{24}$/.test(search)) {
+        query.$or.push({ _id: new mongoose.Types.ObjectId(search) });
+      }
     }
 
     const leads = await Lead.find(query)
@@ -179,6 +189,7 @@ export async function POST(req: NextRequest) {
       currency = 'USD',
       nextFollowUpDate,
       initialNote,
+      remarks,
       billing: rawBilling,
     } = body;
 
@@ -382,7 +393,12 @@ export async function POST(req: NextRequest) {
       ];
     }
 
+    const leadObjectId = new mongoose.Types.ObjectId();
+    const shortCode = leadObjectId.toString().slice(-6).toUpperCase();
+    const finalRef = invoiceNumber?.trim() || `AC-${shortCode}`;
+
     const newLead = await Lead.create({
+      _id: leadObjectId,
       name: name.trim(),
       phone: phone.trim(),
       email: email?.trim(),
@@ -413,10 +429,13 @@ export async function POST(req: NextRequest) {
       paymentStatus,
       pnr: pnr?.trim(),
       ticketNumber: ticketNumber?.trim(),
-      invoiceNumber: invoiceNumber?.trim(),
+      invoiceNumber: finalRef,
+      referenceNumber: finalRef,
       priceQuoted: Number(priceQuoted) || 0,
       currency,
       nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : undefined,
+      remarks: remarks || initialNote || '',
+      initialNote: initialNote || remarks || '',
       billing,
       notes,
       activityLog,

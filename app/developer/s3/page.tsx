@@ -1,11 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { notFound } from 'next/navigation';
 import { AppLayout } from '@/components/AppLayout';
 import { DeveloperHeader } from '@/components/dev/DeveloperHeader';
 import { S3Manager } from '@/components/dev/S3Manager';
 
 export default function S3DeveloperPage() {
+  if (process.env.NODE_ENV === 'production') {
+    notFound();
+  }
   const [envStatus, setEnvStatus] = useState<any>(null);
   const [loadingEnv, setLoadingEnv] = useState(true);
 

@@ -6,12 +6,39 @@
  * raw curly braces in customer-facing emails.
  */
 
+import AirPortData from '@/data/airportSData';
+import AirlineOptimizeData from '@/data/AirportOptimizeData.json';
+import { resolveDateTime } from '@/lib/pnr/enricher';
+
+// Lazy airport map cache
+let airportMap: Map<string, { airportName: string; cityName: string; countryName: string }> | null = null;
+function getAirportMap() {
+  if (!airportMap) {
+    airportMap = new Map();
+    if (Array.isArray(AirPortData)) {
+      for (const item of AirPortData) {
+        if (item && item.airportCode) {
+          airportMap.set(item.airportCode.toUpperCase(), {
+            airportName: item.airportName || item.airportCode,
+            cityName: item.cityName || '',
+            countryName: item.countryName || '',
+          });
+        }
+      }
+    }
+  }
+  return airportMap;
+}
+
+const airlines = AirlineOptimizeData as Record<string, { code: string; name: string }>;
+
 export interface TemplateVariables {
   // Passenger
   name?: string;
   email?: string;
   phone?: string;
   gender?: string;
+  dob?: string;
 
   // Booking meta
   booking_reference?: string;
@@ -87,6 +114,7 @@ const DEFAULT_FALLBACKS: Record<string, string> = {
   email: 'On file',
   phone: 'On file',
   gender: 'On file',
+  dob: 'On file',
   booking_reference: 'PENDING',
   date_booked: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
   pnr: 'PENDING',
@@ -171,193 +199,187 @@ export function extractTemplateVariables(template: string): string[] {
 }
 
 /**
- * Dynamically builds HTML cards for flight legs.
- * Supports single leg (One Way) without showing 'N/A' tables, and multi-leg / round trips cleanly.
+ * Dynamically builds HTML table for flight legs matching the 4-column specification:
+ * Carrier / Flight | Class | Departing | Arriving
  */
 export function buildItineraryHtml(lead: any): string {
   if (!lead) return '';
-  const legs = Array.isArray(lead.flightLegs) && lead.flightLegs.length > 0 ? lead.flightLegs : [];
-
-  const fmtDate = (d?: string | Date) => {
-    if (!d) return 'Schedule Pending';
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return String(d);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+  const airportLookup = getAirportMap();
+  let legs = Array.isArray(lead.flightLegs) && lead.flightLegs.length > 0 ? lead.flightLegs : [];
 
   // If no explicit legs in array, build from multi-city routes or origin/destination
   if (legs.length === 0) {
     if (lead.tripType === 'Multi-City' && Array.isArray(lead.multiCityRoutes) && lead.multiCityRoutes.length > 0) {
+      legs = lead.multiCityRoutes.map((r: any, idx: number) => ({
+        carrier: lead.airline || 'Airlines Consolidator',
+        flightNumber: `Sector ${idx + 1}`,
+        flightClass: 'Economy',
+        departingAirport: r.origin,
+        arrivingAirport: r.destination,
+        departingAt: r.travelDate,
+        arrivingAt: r.travelDate,
+      }));
+    } else {
+      const isRoundTrip = lead.tripType === 'Round Trip' || Boolean(lead.returnDate);
       const carrier = lead.airline || 'Airlines Consolidator';
-      return lead.multiCityRoutes.map((r: any, idx: number) => {
-        const depDate = fmtDate(r.travelDate);
-        return `
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2ECFB; border-radius:10px; margin-bottom:14px; overflow:hidden;">
-          <tr>
-            <td colspan="2" style="background-color:#0B3C8A; padding:10px 16px;">
-              <span style="color:#ffffff; font-size:13px; font-weight:700;">${carrier} · Sector ${idx + 1}</span>
-              <span style="float:right; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:700; padding:2px 10px; border-radius:12px;">Economy</span>
-            </td>
-          </tr>
-          <tr>
-            <td width="50%" style="padding:16px; vertical-align:top; border-right:1px solid #EEF3FB;">
-              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Departing (Sector ${idx + 1})</div>
-              <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${r.origin || 'Origin'}</div>
-              <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${depDate}</div>
-            </td>
-            <td width="50%" style="padding:16px; vertical-align:top;">
-              <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Arriving</div>
-              <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${r.destination || 'Destination'}</div>
-              <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">Schedule Confirmed</div>
-            </td>
-          </tr>
-        </table>
-        `;
-      }).join('');
+      const fNum = lead.flightNumber || (lead.pnr ? `${carrier.slice(0, 2).toUpperCase()} ${lead.pnr.slice(2) || '101'}` : 'FL 101');
+      legs = [
+        {
+          carrier,
+          flightNumber: fNum,
+          flightClass: 'Economy',
+          departingAirport: lead.origin,
+          arrivingAirport: lead.destination,
+          departingAt: lead.travelDate,
+          arrivingAt: lead.travelDate,
+        },
+      ];
+      if (isRoundTrip && lead.returnDate) {
+        legs.push({
+          carrier,
+          flightNumber: `${fNum} (Return)`,
+          flightClass: 'Economy',
+          departingAirport: lead.destination,
+          arrivingAirport: lead.origin,
+          departingAt: lead.returnDate,
+          arrivingAt: lead.returnDate,
+        });
+      }
     }
-
-    const isRoundTrip = lead.tripType === 'Round Trip' || Boolean(lead.returnDate);
-    const carrier = lead.airline || 'Airlines Consolidator';
-    const fNum = lead.flightNumber || (lead.pnr ? `${carrier.slice(0, 2).toUpperCase()} ${lead.pnr.slice(2) || '101'}` : 'FL 101');
-    const depDate = fmtDate(lead.travelDate);
-    const arrDate = lead.travelDate ? fmtDate(lead.travelDate) : 'Schedule Pending';
-
-    let html = `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2ECFB; border-radius:10px; margin-bottom:14px; overflow:hidden;">
-        <tr>
-          <td colspan="2" style="background-color:#0B3C8A; padding:10px 16px;">
-            <span style="color:#ffffff; font-size:13px; font-weight:700;">${carrier} ${fNum}</span>
-            <span style="float:right; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:700; padding:2px 10px; border-radius:12px;">Economy</span>
-          </td>
-        </tr>
-        <tr>
-          <td width="50%" style="padding:16px; vertical-align:top; border-right:1px solid #EEF3FB;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Departing</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${lead.origin || 'Origin'}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${depDate}</div>
-          </td>
-          <td width="50%" style="padding:16px; vertical-align:top;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Arriving</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${lead.destination || 'Destination'}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${arrDate}</div>
-          </td>
-        </tr>
-      </table>
-    `;
-
-    if (isRoundTrip && lead.returnDate) {
-      const retDepDate = fmtDate(lead.returnDate);
-      html += `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2ECFB; border-radius:10px; margin-bottom:20px; overflow:hidden;">
-        <tr>
-          <td colspan="2" style="background-color:#0B3C8A; padding:10px 16px;">
-            <span style="color:#ffffff; font-size:13px; font-weight:700;">${carrier} (Return Flight)</span>
-            <span style="float:right; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:700; padding:2px 10px; border-radius:12px;">Economy</span>
-          </td>
-        </tr>
-        <tr>
-          <td width="50%" style="padding:16px; vertical-align:top; border-right:1px solid #EEF3FB;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Departing</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${lead.destination || 'Destination'}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${retDepDate}</div>
-          </td>
-          <td width="50%" style="padding:16px; vertical-align:top;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Arriving</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${lead.origin || 'Origin'}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${retDepDate}</div>
-          </td>
-        </tr>
-      </table>
-      `;
-    }
-
-    return html;
   }
 
-  // If explicit legs exist in lead:
-  return legs.map((leg: any, idx: number) => {
-    const carrier = leg.carrier || lead.airline || 'Airlines Consolidator';
-    const fNum = leg.flightNumber ? (leg.carrier ? `${leg.carrier} ${leg.flightNumber}` : leg.flightNumber) : (idx === 0 ? 'FL 101' : `FL 10${idx + 1}`);
+  const rows = legs.map((leg: any) => {
+    const carrier = leg.carrier || lead.airline || 'Airline';
+    const fNum = leg.flightNumber ? (leg.carrier && !leg.flightNumber.includes(leg.carrier) ? `${leg.carrier} ${leg.flightNumber}` : leg.flightNumber) : 'FL 101';
     const fClass = leg.flightClass || 'Economy';
-    const depAirport = leg.departingAirport || lead.origin || 'Origin';
-    const arrAirport = leg.arrivingAirport || lead.destination || 'Destination';
-    const depTime = fmtDate(leg.departingAt || lead.travelDate);
-    const arrTime = fmtDate(leg.arrivingAt || leg.departingAt || lead.travelDate);
+
+    const depCode = (leg.departingAirport || lead.origin || 'DEP').toUpperCase();
+    const arrCode = (leg.arrivingAirport || lead.destination || 'ARR').toUpperCase();
+
+    const depAp = airportLookup.get(depCode);
+    const arrAp = airportLookup.get(arrCode);
+
+    const depAirportName = depAp?.airportName || depCode;
+    const depCityCountry = [depAp?.cityName, depAp?.countryName].filter(Boolean).join(', ');
+    const arrAirportName = arrAp?.airportName || arrCode;
+    const arrCityCountry = [arrAp?.cityName, arrAp?.countryName].filter(Boolean).join(', ');
+
+    const depResolved = resolveDateTime(leg.departingAt || lead.travelDate);
+    const arrResolved = resolveDateTime(leg.arrivingAt || leg.departingAt || lead.travelDate);
 
     return `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2ECFB; border-radius:10px; margin-bottom:14px; overflow:hidden;">
-        <tr>
-          <td colspan="2" style="background-color:#0B3C8A; padding:10px 16px;">
-            <span style="color:#ffffff; font-size:13px; font-weight:700;">${fNum}</span>
-            <span style="float:right; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:700; padding:2px 10px; border-radius:12px;">${fClass}</span>
-          </td>
-        </tr>
-        <tr>
-          <td width="50%" style="padding:16px; vertical-align:top; border-right:1px solid #EEF3FB;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Departing (Leg ${idx + 1})</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${depAirport}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${depTime}</div>
-          </td>
-          <td width="50%" style="padding:16px; vertical-align:top;">
-            <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#8a9bbf; margin-bottom:6px;">Arriving</div>
-            <div style="font-size:14px; font-weight:700; color:#1a2b4c;">${arrAirport}</div>
-            <div style="font-size:13px; color:#0B3C8A; font-weight:600; margin-top:4px;">${arrTime}</div>
-          </td>
-        </tr>
-        ${(leg.baggage || leg.meal || leg.seat) ? `
-        <tr>
-          <td colspan="2" style="background-color:#F8FAFF; padding:8px 16px; border-top:1px solid #EEF3FB; font-size:11px; color:#5b7bab;">
-            ${[
-              leg.baggage && `<strong style="color:#1a2b4c;">Baggage:</strong> ${leg.baggage}`,
-              leg.meal && `<strong style="color:#1a2b4c;">Meal:</strong> ${leg.meal}`,
-              leg.seat && `<strong style="color:#1a2b4c;">Seat:</strong> ${leg.seat}`,
-            ].filter(Boolean).join(' &nbsp;&bull;&nbsp; ')}
-          </td>
-        </tr>
-        ` : ''}
-      </table>
+      <tr>
+        <!-- Carrier / Flight -->
+        <td style="padding:12px 14px; font-size:13px; color:#1a2b4c; vertical-align:top; border:1px solid #E2ECFB; width:26%;">
+          <div style="font-weight:700; color:#1a2b4c; font-size:13px;">${carrier}</div>
+          <div style="color:#0B3C8A; font-weight:700; font-family:monospace; font-size:12px; margin-top:3px;">${fNum}</div>
+          ${leg.operatingCarrier ? `<div style="font-size:10.5px; color:#64748B; margin-top:3px;">${leg.operatingCarrier}</div>` : ''}
+        </td>
+        <!-- Class -->
+        <td style="padding:12px 14px; font-size:13px; color:#1a2b4c; vertical-align:top; border:1px solid #E2ECFB; width:14%;">
+          <span style="display:inline-block; background-color:#FFC107; color:#0B3C8A; font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px;">${fClass}</span>
+        </td>
+        <!-- Departing -->
+        <td style="padding:12px 14px; font-size:12.5px; color:#1a2b4c; vertical-align:top; border:1px solid #E2ECFB; width:30%;">
+          <div style="font-weight:700; color:#1E293B;">${depAirportName} (${depCode})</div>
+          ${depCityCountry ? `<div style="font-size:11.5px; color:#64748B; margin-top:2px;">${depCityCountry}</div>` : ''}
+          <div style="font-size:12px; color:#0B3C8A; font-weight:700; margin-top:4px;">${depResolved.formattedDateTime}</div>
+        </td>
+        <!-- Arriving -->
+        <td style="padding:12px 14px; font-size:12.5px; color:#1a2b4c; vertical-align:top; border:1px solid #E2ECFB; width:30%;">
+          <div style="font-weight:700; color:#1E293B;">${arrAirportName} (${arrCode})</div>
+          ${arrCityCountry ? `<div style="font-size:11.5px; color:#64748B; margin-top:2px;">${arrCityCountry}</div>` : ''}
+          <div style="font-size:12px; color:#0B3C8A; font-weight:700; margin-top:4px;">${arrResolved.formattedDateTime}</div>
+        </td>
+      </tr>
     `;
   }).join('');
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; border:1px solid #E2ECFB; border-radius:8px; margin-bottom:24px; background:#ffffff; overflow:hidden;">
+      <thead>
+        <tr style="background-color:#F3F7FF; border-bottom:2px solid #E2ECFB;">
+          <th style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; font-weight:700; text-align:left; border:1px solid #E2ECFB; width:26%;">Carrier / Flight</th>
+          <th style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; font-weight:700; text-align:left; border:1px solid #E2ECFB; width:14%;">Class</th>
+          <th style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; font-weight:700; text-align:left; border:1px solid #E2ECFB; width:30%;">Departing</th>
+          <th style="padding:10px 12px; font-size:11px; color:#5b7bab; text-transform:uppercase; font-weight:700; text-align:left; border:1px solid #E2ECFB; width:30%;">Arriving</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
 }
 
 /**
- * Dynamically builds HTML table rows for passengers.
+ * Dynamically builds HTML table rows for passengers with DOB, Gender, and PNR.
  */
 export function buildPassengersHtml(lead: any): string {
   if (!lead) return '';
   const paxList = Array.isArray(lead.passengers) && lead.passengers.length > 0 ? lead.passengers : [];
+  const pnrVal = lead.pnr || 'On File';
+
   if (paxList.length === 0) {
     return `
       <tr>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; font-weight:600; border:1px solid #E2ECFB;">${lead.name || 'Valued Passenger'}</td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${lead.gender || '—'}</td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${lead.phone || '—'}</td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${lead.email || '—'}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; font-weight:700; border:1px solid #E2ECFB;">${lead.name || 'Valued Passenger'}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; border:1px solid #E2ECFB;">${lead.dob || '—'}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; border:1px solid #E2ECFB;">${lead.gender || '—'}</td>
+        <td style="padding:12px; font-size:13px; color:#0B3C8A; font-weight:700; font-family:monospace; border:1px solid #E2ECFB;">${pnrVal}</td>
       </tr>
     `;
   }
 
   return paxList.map((pax: any) => {
     const fullName = [pax.firstName, pax.lastName].filter(Boolean).join(' ') || lead.name || 'Valued Passenger';
-    const dobInfo = pax.dob ? `<div style="font-size:11px; color:#64748B; margin-top:2px;">DOB: ${pax.dob}</div>` : '';
+    const dobVal = pax.dob || lead.dob || '—';
+    const genderVal = pax.gender || lead.gender || '—';
     return `
       <tr>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; font-weight:600; border:1px solid #E2ECFB;">
-          ${fullName}
-          ${dobInfo}
-        </td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${pax.gender || '—'}</td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${pax.phone || lead.phone || '—'}</td>
-        <td style="padding:12px; font-size:14px; color:#1a2b4c; border:1px solid #E2ECFB;">${pax.email || lead.email || '—'}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; font-weight:700; border:1px solid #E2ECFB;">${fullName}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; border:1px solid #E2ECFB;">${dobVal}</td>
+        <td style="padding:12px; font-size:13px; color:#1a2b4c; border:1px solid #E2ECFB;">${genderVal}</td>
+        <td style="padding:12px; font-size:13px; color:#0B3C8A; font-weight:700; font-family:monospace; border:1px solid #E2ECFB;">${pnrVal}</td>
       </tr>
     `;
   }).join('');
+}
+
+/**
+ * Dynamically builds HTML for Primary Contact Details.
+ */
+export function buildContactDetailsHtml(lead: any): string {
+  if (!lead) return '';
+  const primaryName = lead.name || 'Valued Customer';
+  const phone = lead.phone || 'On File';
+  const email = lead.email || 'On File';
+
+  const addr = lead.billing?.address;
+  const billingAddress = addr
+    ? [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode].filter(Boolean).join(', ')
+    : 'On file / Verified';
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; background-color:#F8FAFF; border:1px solid #E2ECFB; border-radius:8px; margin-bottom:24px; overflow:hidden;">
+      <tr>
+        <td style="padding:10px 14px; font-size:12px; color:#5b7bab; font-weight:700; border-bottom:1px solid #E2ECFB; width:30%;">Primary Contact:</td>
+        <td style="padding:10px 14px; font-size:13px; color:#1a2b4c; font-weight:700; border-bottom:1px solid #E2ECFB;">${primaryName}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 14px; font-size:12px; color:#5b7bab; font-weight:700; border-bottom:1px solid #E2ECFB;">Phone Number:</td>
+        <td style="padding:10px 14px; font-size:13px; color:#1a2b4c; font-weight:600; border-bottom:1px solid #E2ECFB;">${phone}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 14px; font-size:12px; color:#5b7bab; font-weight:700; border-bottom:1px solid #E2ECFB;">Email Address:</td>
+        <td style="padding:10px 14px; font-size:13px; color:#1a2b4c; font-weight:600; border-bottom:1px solid #E2ECFB;">${email}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 14px; font-size:12px; color:#5b7bab; font-weight:700;">Billing Address:</td>
+        <td style="padding:10px 14px; font-size:13px; color:#1a2b4c; font-weight:600;">${billingAddress}</td>
+      </tr>
+    </table>
+  `;
 }
 
 /**
@@ -432,9 +454,10 @@ export function buildTemplateVariables(
   // Card info
   const card = lead.billing?.card;
 
-  // Booking reference: prefer invoiceNumber, fall back to pnr, then short ID
+  // Booking reference: prefer referenceNumber, invoiceNumber, pnr, then short ID
   const leadIdShort = lead._id ? lead._id.toString().slice(-6).toUpperCase() : '';
   const bookingReference =
+    lead.referenceNumber ||
     lead.invoiceNumber ||
     lead.pnr ||
     (leadIdShort ? `AC-${leadIdShort}` : 'AC-PENDING');
@@ -448,55 +471,53 @@ export function buildTemplateVariables(
   const isRoundTrip = lead.tripType === 'Round Trip' || (legs.length > 1);
   const defaultAirline = lead.airline || (pnr && pnr.length >= 2 && !pnr.startsWith('PEND') ? pnr.slice(0, 2).toUpperCase() : 'Airlines Consolidator');
   const flight1Number = leg1?.flightNumber ? (leg1.carrier ? `${leg1.carrier} ${leg1.flightNumber}` : leg1.flightNumber) : (lead.flight1Number || lead.flightNumber || (pnr ? `${defaultAirline} ${pnr.slice(2) || '101'}` : 'FL 101'));
-  const flight2Number = leg2?.flightNumber ? (leg2.carrier ? `${leg2.carrier} ${leg2.flightNumber}` : leg2.flightNumber) : (lead.flight2Number || 'FL 102');
+  const flight2Number = leg2?.flightNumber ? (leg2.carrier ? `${leg2.carrier} ${leg2.flightNumber}` : leg2.flightNumber) : (lead.flight2Number || (pnr ? `${defaultAirline} ${pnr.slice(2) || '102'}` : 'FL 102'));
 
-  // Assigned Agent details
-  const resolvedAgentName = agentName || lead.assignedTo?.name || 'Concierge Team';
-  const resolvedAgentEmail = agentEmail || lead.assignedTo?.email || 'concierge@airlinesconsolidator.com';
-  const resolvedAgentPhone = agentPhone || lead.assignedTo?.phone || '+1 (888) 883-0727';
+  const dep1DateFormatted = resolveDateTime(leg1?.departingAt || lead.travelDate).formattedDateTime;
+  const arr1DateFormatted = resolveDateTime(leg1?.arrivingAt || leg1?.departingAt || lead.travelDate).formattedDateTime;
+  const dep2DateFormatted = resolveDateTime(leg2?.departingAt || lead.returnDate || lead.travelDate).formattedDateTime;
+  const arr2DateFormatted = resolveDateTime(leg2?.arrivingAt || leg2?.departingAt || lead.returnDate || lead.travelDate).formattedDateTime;
 
-  // Departure and arrival datetimes
-  const dep1DateFormatted = leg1?.departingAt ? fmt(leg1.departingAt, true) : (lead.travelDate ? fmt(lead.travelDate, true) : 'Schedule Pending');
-  const arr1DateFormatted = leg1?.arrivingAt ? fmt(leg1.arrivingAt, true) : (lead.flight1ArrDatetime || (lead.travelDate ? `${fmt(lead.travelDate)} (Estimated)` : 'Schedule Pending'));
-
-  const dep2DateFormatted = isRoundTrip
-    ? (leg2?.departingAt ? fmt(leg2.departingAt, true) : (lead.returnDate ? fmt(lead.returnDate, true) : (lead.travelDate ? `${fmt(lead.travelDate)} (Return TBA)` : 'Return Schedule TBA')))
-    : '';
-  const arr2DateFormatted = isRoundTrip
-    ? (leg2?.arrivingAt ? fmt(leg2.arrivingAt, true) : (lead.flight2ArrDatetime || (lead.returnDate ? `${fmt(lead.returnDate)} (Estimated)` : 'Arrival Schedule TBA')))
-    : '';
-
-  // Passenger primary details
+  // Primary passenger name resolution
   const paxList = Array.isArray(lead.passengers) && lead.passengers.length > 0 ? lead.passengers : [];
   const primaryPax = paxList[0];
-  const primaryName = primaryPax ? [primaryPax.firstName, primaryPax.lastName].filter(Boolean).join(' ') : (lead.name || 'Valued Passenger');
-  const primaryGender = primaryPax?.gender || lead.gender || 'On file';
-  const primaryPhone = primaryPax?.phone || lead.phone || 'On file';
-  const primaryEmail = primaryPax?.email || lead.email || 'On file';
+  const primaryName = primaryPax
+    ? [primaryPax.firstName, primaryPax.lastName].filter(Boolean).join(' ')
+    : (lead.name || 'Valued Passenger');
 
-  const itineraryHtml = buildItineraryHtml(lead);
-  const passengersHtml = buildPassengersHtml(lead);
+  // Resolved Agent details
+  const assignedAgent = lead.assignedTo;
+  const resolvedAgentName =
+    agentName || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.name : '') || 'Concierge Team';
+  const resolvedAgentEmail =
+    agentEmail || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.email : '') || 'concierge@airlinesconsolidator.com';
+  const resolvedAgentPhone =
+    agentPhone || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.phone : '') || '+1 (888) 883-0727';
 
   return {
-    // Passenger
+    // Passenger & Contact
     name: primaryName,
-    email: primaryEmail,
-    phone: primaryPhone,
-    gender: primaryGender,
+    email: lead.email || 'On file',
+    phone: lead.phone || 'On file',
+    gender: primaryPax?.gender || lead.gender || 'On file',
+    dob: primaryPax?.dob || lead.dob || 'On file',
 
-    // Dynamic HTML Blocks
-    itinerary_legs_html: itineraryHtml,
-    passengers_rows_html: passengersHtml,
-
-    // Booking meta
+    // Booking Meta
     booking_reference: bookingReference,
-    date_booked: fmt(lead.createdAt || new Date()),
-    pnr: lead.pnr || (leadIdShort ? `PNR-${leadIdShort}` : 'PENDING'),
+    reference_number: bookingReference,
+    ref_number: bookingReference,
+    date_booked: lead.createdAt ? fmt(lead.createdAt) : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    pnr: lead.pnr || bookingReference,
     invoice_number: lead.invoiceNumber || bookingReference,
-    ticket_number: lead.ticketNumber || (lead.pnr ? `ETKT-${lead.pnr}` : 'Pending Issuance'),
+    ticket_number: lead.ticketNumber || 'Pending Issuance',
+
+    // Dynamic HTML Sections
+    passengers_rows_html: buildPassengersHtml(lead),
+    itinerary_legs_html: buildItineraryHtml(lead),
+    contact_details_html: buildContactDetailsHtml(lead),
 
     // Itinerary
-    origin: leg1?.departingAirport || lead.origin || 'Origin',
+    origin: (legs.length > 0 ? legs[0].departingAirport : lead.origin) || lead.origin || 'Origin',
     destination: (legs.length > 0 ? legs[legs.length - 1].arrivingAirport : lead.destination) || lead.destination || 'Destination',
     travel_date: lead.travelDate ? fmt(lead.travelDate) : (leg1?.departingAt ? fmt(leg1.departingAt) : 'Date TBA'),
     return_date: lead.returnDate ? fmt(lead.returnDate) : (isRoundTrip ? (leg2?.departingAt ? fmt(leg2.departingAt) : 'Date TBA') : 'N/A (One Way)'),

@@ -84,7 +84,7 @@ export async function seedDatabase(force = false) {
       <li><strong>Route:</strong> {{origin}} &rarr; {{destination}}</li>
       <li><strong>Departure Date:</strong> {{travel_date}}</li>
       <li><strong>Passengers:</strong> {{pax}}</li>
-      <li><strong>Total Quoted Fare:</strong> <span style="color: #C2410C; font-weight: 700; font-size: 18px;">\${{price}}</span></li>
+      <li><strong>Total Quoted Fare:</strong> <span style="color: #C2410C; font-weight: 700; font-size: 18px;">{{currency}} {{price}}</span></li>
     </ul>
   </div>
 
@@ -108,7 +108,7 @@ export async function seedDatabase(force = false) {
   </div>
   <p>Hello <strong>{{name}}</strong>,</p>
   <p>I wanted to follow up regarding your flight inquiry for <strong>{{origin}}</strong> to <strong>{{destination}}</strong> on <strong>{{travel_date}}</strong>.</p>
-  <p>The airline inventory for the special quoted rate of <strong>\${{price}}</strong> is held for only 24 hours. Would you like us to proceed with ticket issuance or adjust your flight timings?</p>
+  <p>The airline inventory for the special quoted rate of <strong>{{currency}} {{price}}</strong> is held for only 24 hours. Would you like us to proceed with ticket issuance or adjust your flight timings?</p>
   <p style="margin: 25px 0;">
     <a href="https://example.com/talk-to-agent" style="background: #F59E0B; color: #1C1917; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Speak with Agent</a>
   </p>
@@ -161,7 +161,7 @@ export async function seedDatabase(force = false) {
       <p style="margin:4px 0; font-size:13px;"><strong>Arrival:</strong> {{flight1_arr_airport}}</p>
     </div>
     <div style="background:#FFF7DA; border:1px solid #FFE58A; border-radius:8px; padding:12px; margin:16px 0; font-size:14px; font-weight:bold; color:#7a5c00;">
-      Total Authorized Amount: <span style="color:#0B3C8A; font-size:18px;">{{currency}} \${{price}}</span>
+      Total Authorized Amount: <span style="color:#0B3C8A; font-size:18px;">{{currency}} {{price}}</span>
     </div>
     <p style="font-size:12px; color:#5c6b85;">Authorized Card: <strong>{{card_brand}} ending in {{card_last4}}</strong> &bull; Cardholder: <strong>{{card_holder_name}}</strong></p>
     <p style="font-size:12px; color:#5c6b85;">Support Contact: <strong>{{company_phone}}</strong> &bull; {{company_name}}</p>
