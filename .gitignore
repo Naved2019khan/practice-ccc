@@ -158,3 +158,5 @@ desktop.ini
 # Secrets  
 *.pem  
 *.key 
+
+*.zip
