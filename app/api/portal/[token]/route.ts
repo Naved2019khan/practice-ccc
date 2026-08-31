@@ -2,7 +2,53 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { Lead } from '@/models/Lead';
 import { parseUserAgent, getClientIp, resolveIpLocation } from '@/lib/tracking';
+import { sendEmail } from '@/lib/email';
 import mongoose from 'mongoose';
+
+/**
+ * Where portal-visit notifications go. No dedicated CS inbox yet, so this
+ * falls back to an example/owner address; set CS_TEAM_EMAIL in the env to route
+ * it to the real customer-service team.
+ */
+const CS_TEAM_EMAIL = process.env.CS_TEAM_EMAIL || 'cs-team@example.com';
+
+/**
+ * Send an email, retrying exactly once on failure. Returns true on success.
+ * Per requirement: try once; if it fails, retry once; after that, give up.
+ */
+async function sendWithSingleRetry(opts: { to: string; subject: string; html: string; leadId?: string }): Promise<boolean> {
+  const first = await sendEmail(opts);
+  if (first.success) return true;
+  console.warn('[Portal CS notify] first attempt failed, retrying once:', first.error);
+  const second = await sendEmail(opts);
+  if (second.success) return true;
+  console.error('[Portal CS notify] retry failed, giving up:', second.error);
+  return false;
+}
+
+/** Builds the CS-team notification email body from the visited lead. */
+function buildCsNotificationHtml(lead: any, visit: { ip: string; location: string; device: string; at: Date }): string {
+  const esc = (v: any) => String(v ?? '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const paxNames = Array.isArray(lead.passengers) && lead.passengers.length > 0
+    ? lead.passengers.map((p: any) => [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ')).filter(Boolean).join(', ')
+    : (lead.name || '—');
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#1a2b4c;">
+      <h2 style="color:#0B3C8A;margin:0 0 12px;">Customer viewed their booking portal</h2>
+      <p style="font-size:13px;color:#4a5b7f;margin:0 0 16px;">A customer just opened their itinerary/authorization portal. Please follow up.</p>
+      <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+        <tr><td style="color:#5b7bab;">Lead</td><td style="font-weight:700;">${esc(lead.name)} (${esc(lead._id)})</td></tr>
+        <tr><td style="color:#5b7bab;">Passenger(s)</td><td>${esc(paxNames)}</td></tr>
+        <tr><td style="color:#5b7bab;">Contact</td><td>${esc(lead.phone)} · ${esc(lead.email)}</td></tr>
+        <tr><td style="color:#5b7bab;">Route</td><td>${esc(lead.origin)} → ${esc(lead.destination)}</td></tr>
+        <tr><td style="color:#5b7bab;">PNR / Ref</td><td>${esc(lead.pnr || lead.invoiceNumber || lead.referenceNumber)}</td></tr>
+        <tr><td style="color:#5b7bab;">Payment</td><td>${esc(lead.paymentStatus)} · ${esc(lead.currency || 'USD')} ${esc(lead.priceQuoted || 0)}</td></tr>
+        <tr><td style="color:#5b7bab;">Viewed at</td><td>${esc(visit.at.toISOString())}</td></tr>
+        <tr><td style="color:#5b7bab;">Visitor</td><td>${esc(visit.device)} · IP ${esc(visit.ip)} · ${esc(visit.location)}</td></tr>
+      </table>
+    </div>
+  `;
+}
 
 export async function GET(
   req: NextRequest,
@@ -127,6 +173,35 @@ export async function GET(
           activityLog: activityItem,
         },
       });
+
+      // Notify the CS team the first time this customer opens the portal.
+      // Send once: skip if a successful notification was already logged.
+      const alreadyNotified = (lead.activityLog || []).some((a: any) => a.type === 'cs_notified');
+      if (!alreadyNotified) {
+        const sent = await sendWithSingleRetry({
+          to: CS_TEAM_EMAIL,
+          subject: `Portal viewed — ${lead.name || 'Lead'} (${lead.origin || '—'} → ${lead.destination || '—'})`,
+          html: buildCsNotificationHtml(lead, { ip, location, device: parsedUa.summary, at: now }),
+          leadId: lead._id.toString(),
+        });
+        if (sent) {
+          // Log a marker so we never notify CS again for this lead.
+          await Lead.findByIdAndUpdate(lead._id, {
+            $push: {
+              activityLog: {
+                id: `act_cs_notify_${Date.now()}`,
+                type: 'cs_notified',
+                description: `CS team notified of portal view (${CS_TEAM_EMAIL})`,
+                actorName: 'System',
+                timestamp: new Date(),
+                meta: { to: CS_TEAM_EMAIL, ip, location },
+              },
+            },
+          });
+        }
+        // On failure after the single retry we do NOT log the marker, so a
+        // later visit can attempt the notification again.
+      }
     }
 
     // 3. Return sanitized customer payload

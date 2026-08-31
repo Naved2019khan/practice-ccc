@@ -6,6 +6,8 @@ import { getAuthUser } from '@/lib/auth';
 import { getNextRoundRobinStaff } from '@/lib/assignment';
 import { validateLeadForm, digitsOnly } from '@/lib/validation';
 import { normalizeBilling } from '@/lib/billing';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { extractRouteFromHtml } from '@/lib/pnrHtmlExtract';
 import {
   isBookingType,
   isLeadStatus,
@@ -183,6 +185,7 @@ export async function POST(req: NextRequest) {
       assignedTo: reqAssignedTo,
       paymentStatus = 'Pending',
       pnr,
+      pnrHtml,
       ticketNumber,
       invoiceNumber,
       priceQuoted = 0,
@@ -193,9 +196,9 @@ export async function POST(req: NextRequest) {
       billing: rawBilling,
     } = body;
 
-    if (!name || !phone || !origin || !destination) {
+    if (!phone) {
       return NextResponse.json(
-        { error: 'Name, phone, origin, and destination are required fields' },
+        { error: 'Phone is a required field' },
         { status: 400 }
       );
     }
@@ -213,6 +216,7 @@ export async function POST(req: NextRequest) {
       returnDate,
       pax,
       tripType,
+      passengers: body.passengers,
       priceQuoted,
       nextFollowUpDate,
       billing: rawBilling
@@ -245,6 +249,11 @@ export async function POST(req: NextRequest) {
       finalAssignedTo = new mongoose.Types.ObjectId(reqAssignedTo);
       const assignedStaff = await User.findById(finalAssignedTo);
       assignmentMethod = assignedStaff ? assignedStaff.name : 'Selected Staff';
+    } else if (reqAssignedTo === null) {
+      // Explicit "Unassigned" choice — leave the lead with no staff and skip
+      // both self-assign and round-robin.
+      finalAssignedTo = null;
+      assignmentMethod = 'Unassigned';
     } else if (user.role === 'staff') {
       // Staff creating lead assigns to self
       finalAssignedTo = user._id as mongoose.Types.ObjectId;
@@ -296,7 +305,9 @@ export async function POST(req: NextRequest) {
       ? body.passengers.map((p: any) => ({
           id: p.id || `pax_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           firstName: p.firstName?.trim() || '',
+          middleName: p.middleName?.trim() || '',
           lastName: p.lastName?.trim() || '',
+          type: ['Adult', 'Child', 'Infant'].includes(p.type) ? p.type : 'Adult',
           dob: p.dob || '',
           gender: ['Male', 'Female', 'Other', ''].includes(p.gender) ? p.gender : '',
           phone: p.phone?.trim() || '',
@@ -304,14 +315,16 @@ export async function POST(req: NextRequest) {
         }))
       : [];
 
-    if (finalPassengers.length === 0) {
+    if (finalPassengers.length === 0 && name?.trim()) {
       const nameParts = name.trim().split(/\s+/);
       const firstName = nameParts[0] || name.trim();
       const lastName = nameParts.slice(1).join(' ') || '';
       finalPassengers.push({
         id: `pax_${Date.now()}_1`,
         firstName,
+        middleName: '',
         lastName,
+        type: 'Adult',
         dob: '',
         gender: '',
         phone: phone.trim(),
@@ -321,7 +334,9 @@ export async function POST(req: NextRequest) {
         finalPassengers.push({
           id: `pax_${Date.now()}_${i}`,
           firstName: `Passenger ${i}`,
+          middleName: '',
           lastName: '',
+          type: 'Adult',
           dob: '',
           gender: '',
           phone: '',
@@ -347,15 +362,28 @@ export async function POST(req: NextRequest) {
         }))
       : [];
 
-    if (finalFlightLegs.length === 0) {
+    // The form no longer collects origin/destination — they're derived from the
+    // pasted itinerary HTML. Re-derive here so the route is stored even if the
+    // client didn't send it.
+    let resolvedOrigin = origin?.trim() || '';
+    let resolvedDestination = destination?.trim() || '';
+    if ((!resolvedOrigin || !resolvedDestination) && pnrHtml) {
+      const fromHtml = extractRouteFromHtml(String(pnrHtml));
+      resolvedOrigin = resolvedOrigin || fromHtml.origin;
+      resolvedDestination = resolvedDestination || fromHtml.destination;
+    }
+
+    // Only auto-generate flight legs when a route was actually provided. The
+    // form no longer collects origin/destination, so these are usually blank.
+    if (finalFlightLegs.length === 0 && (resolvedOrigin || resolvedDestination)) {
       finalFlightLegs.push({
         id: `leg_${Date.now()}_1`,
         carrier: '',
         flightNumber: '',
         flightClass: 'Economy',
-        departingAirport: origin.trim(),
+        departingAirport: resolvedOrigin,
         departingAt: travelDate ? new Date(travelDate).toISOString() : '',
-        arrivingAirport: destination.trim(),
+        arrivingAirport: resolvedDestination,
         arrivingAt: travelDate ? new Date(travelDate).toISOString() : '',
       });
       if (tripType !== 'One Way' && returnDate) {
@@ -364,9 +392,9 @@ export async function POST(req: NextRequest) {
           carrier: '',
           flightNumber: '',
           flightClass: 'Economy',
-          departingAirport: destination.trim(),
+          departingAirport: resolvedDestination,
           departingAt: new Date(returnDate).toISOString(),
-          arrivingAirport: origin.trim(),
+          arrivingAirport: resolvedOrigin,
           arrivingAt: new Date(returnDate).toISOString(),
         });
       }
@@ -382,12 +410,16 @@ export async function POST(req: NextRequest) {
         }))
       : [];
 
-    if (tripType === 'Multi-City' && finalMultiCityRoutes.length === 0) {
+    if (
+      tripType === 'Multi-City' &&
+      finalMultiCityRoutes.length === 0 &&
+      (resolvedOrigin || resolvedDestination)
+    ) {
       finalMultiCityRoutes = [
         {
           id: `route_${Date.now()}_1`,
-          origin: origin.trim(),
-          destination: destination.trim(),
+          origin: resolvedOrigin,
+          destination: resolvedDestination,
           travelDate: travelDate ? new Date(travelDate).toISOString().split('T')[0] : '',
         },
       ];
@@ -399,12 +431,12 @@ export async function POST(req: NextRequest) {
 
     const newLead = await Lead.create({
       _id: leadObjectId,
-      name: name.trim(),
+      name: name?.trim() || '',
       phone: phone.trim(),
       email: email?.trim(),
       source,
-      origin: origin.trim(),
-      destination: destination.trim(),
+      origin: resolvedOrigin,
+      destination: resolvedDestination,
       travelDate: travelDate ? new Date(travelDate) : undefined,
       returnDate: returnDate ? new Date(returnDate) : undefined,
       pax: numPax,
@@ -428,6 +460,7 @@ export async function POST(req: NextRequest) {
       assignedTo: finalAssignedTo,
       paymentStatus,
       pnr: pnr?.trim(),
+      pnrHtml: sanitizeHtml(pnrHtml),
       ticketNumber: ticketNumber?.trim(),
       invoiceNumber: finalRef,
       referenceNumber: finalRef,

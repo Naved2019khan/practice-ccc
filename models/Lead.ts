@@ -103,7 +103,9 @@ export interface ILeadAttachment {
 export interface IPassenger {
   id: string;
   firstName: string;
+  middleName?: string;
   lastName?: string;
+  type?: 'Adult' | 'Child' | 'Infant';
   dob?: string; // stored as ISO date string for simplicity
   gender?: 'Male' | 'Female' | 'Other' | '';
   phone?: string;
@@ -187,6 +189,8 @@ export interface ILead extends Document {
   assignedTo?: mongoose.Types.ObjectId | null;
   paymentStatus: 'Pending' | 'Authorized' | 'Partial' | 'Paid' | 'Failed' | 'Refunded';
   pnr?: string;
+  /** HTML itinerary pasted from an external PNR converter (e.g. pnrconverter.com). */
+  pnrHtml?: string;
   ticketNumber?: string;
   invoiceNumber?: string;
   referenceNumber?: string;
@@ -337,7 +341,9 @@ const PassengerSchema = new Schema<IPassenger>(
   {
     id: { type: String, required: true },
     firstName: { type: String, trim: true, default: '' },
+    middleName: { type: String, trim: true, default: '' },
     lastName: { type: String, trim: true, default: '' },
+    type: { type: String, enum: ['Adult', 'Child', 'Infant'], default: 'Adult' },
     dob: { type: String, default: '' },
     gender: { type: String, enum: ['Male', 'Female', 'Other', ''], default: '' },
     phone: { type: String, trim: true, default: '' },
@@ -424,7 +430,7 @@ const CustomerPortalSchema = new Schema<ICustomerPortal>(
 
 const LeadSchema = new Schema<ILead>(
   {
-    name: { type: String, required: true, trim: true },
+    name: { type: String, trim: true, default: '' },
     phone: { type: String, required: true, trim: true, index: true },
     email: { type: String, trim: true, lowercase: true },
     source: {
@@ -432,8 +438,8 @@ const LeadSchema = new Schema<ILead>(
       default: 'Website',
       enum: ['Website', 'Contact Us', 'Referral', 'Phone', 'Ads', 'Newsletter', 'Walk-in', 'Import', 'Manual', 'Other'],
     },
-    origin: { type: String, required: true, trim: true },
-    destination: { type: String, required: true, trim: true },
+    origin: { type: String, trim: true, default: '' },
+    destination: { type: String, trim: true, default: '' },
     travelDate: { type: Date },
     returnDate: { type: Date },
     pax: { type: Number, default: 1, min: 1 },
@@ -468,6 +474,7 @@ const LeadSchema = new Schema<ILead>(
       index: true,
     },
     pnr: { type: String, trim: true },
+    pnrHtml: { type: String, default: '' },
     ticketNumber: { type: String, trim: true },
     invoiceNumber: { type: String, trim: true },
     referenceNumber: { type: String, trim: true, index: true },

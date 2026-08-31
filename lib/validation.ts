@@ -51,6 +51,7 @@ export interface LeadFormValues {
   nextFollowUpDate?: string;
   assignedTo?: string;
   initialNote?: string;
+  pnrHtml?: string;
   passengers?: any[];
   flightLegs?: any[];
   multiCityRoutes?: any[];
@@ -272,11 +273,10 @@ export function validateLeadForm(values: LeadFormValues): ValidationErrors {
   const errors: ValidationErrors = {};
 
   /* -- customer ------------------------------------------------------- */
-  if (isBlank(values.name)) errors.name = 'Passenger name is required';
-  else if (!/^[A-Za-z][A-Za-z .'"-]*$/.test(String(values.name).trim()))
+  // Name is optional (passenger names may come from the PNR). If provided, it
+  // must still contain letters only.
+  if (!isBlank(values.name) && !/^[A-Za-z][A-Za-z .'"-]*$/.test(String(values.name).trim()))
     errors.name = 'Name must contain letters only';
-  else if (String(values.name).trim().length < 2)
-    errors.name = 'Enter the passenger’s full name';
 
   if (isBlank(values.phone)) errors.phone = 'Phone number is required';
   else if (!isPhone(String(values.phone))) errors.phone = 'Enter a valid phone number';
@@ -285,9 +285,9 @@ export function validateLeadForm(values: LeadFormValues): ValidationErrors {
     errors.email = 'Enter a valid email address';
 
   /* -- flight --------------------------------------------------------- */
-  if (isBlank(values.origin)) errors.origin = 'Origin is required';
-  if (isBlank(values.destination)) errors.destination = 'Destination is required';
-
+  // Origin/destination are no longer collected on the form (the itinerary is
+  // captured via the pasted PNR HTML), so they are optional. If both happen to
+  // be present, they still must differ.
   const originVal = String(values.origin ?? '').trim().toLowerCase();
   const destVal = String(values.destination ?? '').trim().toLowerCase();
   if (originVal && destVal && originVal === destVal)
@@ -306,6 +306,42 @@ export function validateLeadForm(values: LeadFormValues): ValidationErrors {
   const pax = Number(values.pax);
   if (!isBlank(values.pax) && (!Number.isInteger(pax) || pax < 1 || pax > 99))
     errors.pax = 'Passengers must be a whole number from 1 to 99';
+
+  /* -- passengers ----------------------------------------------------- */
+  // Every traveller on the booking must be fully identified: ticketing needs
+  // the full name, the fare type and the DOB/gender that go on the ticket.
+  const paxCount = Math.max(1, Number.isFinite(pax) && pax > 0 ? pax : 1);
+  const list = Array.isArray(values.passengers) ? values.passengers : [];
+  const nameRe = /^[A-Za-z][A-Za-z .'"-]*$/;
+
+  for (let i = 0; i < paxCount; i++) {
+    const p = list[i] || {};
+    const key = (field: string) => `passengers.${i}.${field}`;
+
+    if (isBlank(p.firstName)) errors[key('firstName')] = 'First name is required';
+    else if (!nameRe.test(String(p.firstName).trim()))
+      errors[key('firstName')] = 'Letters only';
+
+    if (!isBlank(p.middleName) && !nameRe.test(String(p.middleName).trim()))
+      errors[key('middleName')] = 'Letters only';
+
+    if (isBlank(p.lastName)) errors[key('lastName')] = 'Last name is required';
+    else if (!nameRe.test(String(p.lastName).trim()))
+      errors[key('lastName')] = 'Letters only';
+
+    if (isBlank(p.type)) errors[key('type')] = 'Select a passenger type';
+    else if (!['Adult', 'Child', 'Infant'].includes(String(p.type)))
+      errors[key('type')] = 'Select a passenger type';
+
+    if (isBlank(p.dob)) errors[key('dob')] = 'Date of birth is required';
+    else {
+      const dob = parseDateInput(String(p.dob));
+      if (!dob) errors[key('dob')] = 'Enter a valid date';
+      else if (dob > new Date()) errors[key('dob')] = 'Date of birth cannot be in the future';
+    }
+
+    if (isBlank(p.gender)) errors[key('gender')] = 'Select a gender';
+  }
 
   const price = Number(values.priceQuoted);
   if (!isBlank(values.priceQuoted) && (Number.isNaN(price) || price < 0))

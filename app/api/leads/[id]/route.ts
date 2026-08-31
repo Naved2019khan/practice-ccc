@@ -4,6 +4,8 @@ import { Lead } from '@/models/Lead';
 import { User } from '@/models/User';
 import { getAuthUser } from '@/lib/auth';
 import { isBookingType, isLeadStatus } from '@/lib/leadOptions';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
+import { extractRouteFromHtml } from '@/lib/pnrHtmlExtract';
 import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -82,6 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       assignedTo: newAssignedToId,
       paymentStatus,
       pnr,
+      pnrHtml,
       ticketNumber,
       invoiceNumber,
       priceQuoted,
@@ -241,6 +244,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (tripType !== undefined) lead.tripType = tripType;
     if (paymentStatus !== undefined) lead.paymentStatus = paymentStatus;
     if (pnr !== undefined) lead.pnr = pnr?.trim() || '';
+    if (pnrHtml !== undefined) {
+      lead.pnrHtml = sanitizeHtml(pnrHtml);
+      // Keep the stored route in step with the pasted itinerary unless the
+      // request explicitly supplied its own origin/destination.
+      const fromHtml = extractRouteFromHtml(String(pnrHtml || ''));
+      if (!origin?.trim() && fromHtml.origin) lead.origin = fromHtml.origin;
+      if (!destination?.trim() && fromHtml.destination) lead.destination = fromHtml.destination;
+    }
     if (ticketNumber !== undefined) lead.ticketNumber = ticketNumber?.trim() || '';
     if (invoiceNumber !== undefined) lead.invoiceNumber = invoiceNumber?.trim() || '';
     if (priceQuoted !== undefined) lead.priceQuoted = isNaN(Number(priceQuoted)) ? 0 : Number(priceQuoted);
@@ -259,7 +270,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const cleanedPassengers = passengers.map((p: any) => ({
         id: p.id || `pax_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         firstName: p.firstName?.trim() || '',
+        middleName: p.middleName?.trim() || '',
         lastName: p.lastName?.trim() || '',
+        type: ['Adult', 'Child', 'Infant'].includes(p.type) ? p.type : 'Adult',
         dob: p.dob || '',
         gender: ['Male', 'Female', 'Other', ''].includes(p.gender) ? p.gender : '',
         phone: p.phone?.trim() || '',

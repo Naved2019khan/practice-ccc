@@ -11,7 +11,7 @@ export interface DrawerProps {
   children: React.ReactNode;
   /** Pinned action bar at the bottom of the panel. */
   footer?: React.ReactNode;
-  width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+  width?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
   side?: 'right' | 'left';
 }
 
@@ -92,6 +92,7 @@ export const Drawer: React.FC<DrawerProps> = ({
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
     '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
   };
 
   const closedTransform = side === 'right' ? 'translate-x-full' : '-translate-x-full';

@@ -97,3 +97,22 @@ code, pre, .font-code {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s infinite ease-in-out;
 }
+
+/* ── PNR HTML converter (paste-rich editor + preview) ─────────────────── */
+.pnr-html-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #a8a29e;
+  pointer-events: none;
+}
+.pnr-html-preview table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+.pnr-html-preview th,
+.pnr-html-preview td {
+  vertical-align: top;
+}
+.pnr-html-preview img {
+  max-width: 100%;
+  height: auto;
+}

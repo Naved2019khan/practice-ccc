@@ -462,9 +462,9 @@ export const LeadEmailComposerModal: React.FC<LeadEmailComposerModalProps> = ({
 
                       {/* Tab 1: Rendered HTML with substituted variables */}
                       {previewTab === 'rendered' && (
-                        <div className="p-3 bg-white max-h-56 overflow-y-auto border-b border-ember-border">
+                        <div className="p-3 bg-white max-h-56 overflow-auto border-b border-ember-border">
                           <div
-                            className="text-xs origin-top scale-95"
+                            className="text-xs origin-top scale-95 [&_table]:max-w-full [&_img]:max-w-full [&_img]:h-auto break-words"
                             dangerouslySetInnerHTML={{ __html: resolvedHtml }}
                           />
                         </div>
@@ -660,8 +660,11 @@ export const LeadEmailComposerModal: React.FC<LeadEmailComposerModalProps> = ({
               </span>
             </div>
 
-            <div className="p-4 bg-white rounded-card border border-ember-border max-h-[65vh] overflow-y-auto shadow-inner">
-              <div dangerouslySetInnerHTML={{ __html: resolvedHtml }} />
+            <div className="p-4 bg-white rounded-card border border-ember-border max-h-[65vh] overflow-auto shadow-inner">
+              <div
+                className="[&_table]:max-w-full [&_img]:max-w-full [&_img]:h-auto break-words"
+                dangerouslySetInnerHTML={{ __html: resolvedHtml }}
+              />
             </div>
 
             <div className="flex justify-end pt-2">

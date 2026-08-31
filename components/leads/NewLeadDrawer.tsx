@@ -11,10 +11,8 @@ import {
   CheckCircle2,
   MapPin,
   Users,
-  CalendarDays,
-  ArrowRight,
-  Plus,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer';
 import { Modal } from '@/components/ui/Modal';
@@ -26,10 +24,10 @@ import { FormSection } from '@/components/ui/FormSection';
 import { FormRow } from '@/components/ui/FormRow';
 import { PhoneField } from '@/components/ui/PhoneField';
 import { CardNumberInput } from '@/components/ui/CardNumberInput';
-import { AirportInput } from '@/components/ui/AirportInput';
 import { COUNTRIES, DEFAULT_COUNTRY_CODE, getCountry, getDialCode } from '@/lib/countries';
-import { PNRConverterBox } from '@/components/leads/PNRConverterBox';
-import { type ParsePNRResult } from '@/lib/pnr';
+import { HtmlPnrConverter } from '@/components/leads/HtmlPnrConverter';
+import { extractRouteFromHtml } from '@/lib/pnrHtmlExtract';
+import { PassengerList } from '@/components/leads/PassengerList';
 import {
   BOOKING_TYPES,
   DEFAULT_BOOKING_TYPE,
@@ -73,50 +71,39 @@ interface ConfirmLeadModalProps {
 }
 
 function ConfirmLeadModal({ isOpen, form, isSubmitting, submitError, onConfirm, onCancel }: ConfirmLeadModalProps) {
-  const travelDateFormatted = form.travelDate
-    ? new Date(form.travelDate).toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-      })
-    : '—';
+  const passengers = Array.isArray(form.passengers) ? form.passengers : [];
+  const paxCount = Number(form.pax ?? passengers.length ?? 1);
+  const dial = getDialCode(form.phoneDialCode);
+  const hasItinerary = Boolean(form.pnrHtml && String(form.pnrHtml).trim());
 
-  const returnDateFormatted =
-    form.tripType !== 'One Way' && form.returnDate
-      ? new Date(form.returnDate).toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-        })
-      : null;
+  const formatDob = (dob?: string) =>
+    dob
+      ? new Date(dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '—';
 
   const rows: { icon: React.ReactNode; label: string; value: string }[] = [
-    {
-      icon: <UserIcon className="w-3.5 h-3.5" />,
-      label: 'Passenger',
-      value: form.name || '—',
-    },
     {
       icon: <MapPin className="w-3.5 h-3.5" />,
       label: 'Route',
       value:
         form.origin && form.destination
           ? `${form.origin}  →  ${form.destination}`
-          : form.origin || form.destination || '—',
+          : form.origin || form.destination || 'Not detected from itinerary',
     },
     {
-      icon: <Plane className="w-3.5 h-3.5" />,
-      label: 'Trip type',
-      value: `${form.tripType} · ${form.bookingType}`,
+      icon: <UserIcon className="w-3.5 h-3.5" />,
+      label: 'Contact',
+      value: [`${dial} ${form.phone ?? ''}`.trim(), form.email].filter(Boolean).join('  ·  ') || '—',
     },
-    {
-      icon: <CalendarDays className="w-3.5 h-3.5" />,
-      label: 'Depart',
-      value: travelDateFormatted,
-    },
-    ...(returnDateFormatted
-      ? [{ icon: <CalendarDays className="w-3.5 h-3.5" />, label: 'Return', value: returnDateFormatted }]
-      : []),
     {
       icon: <Users className="w-3.5 h-3.5" />,
       label: 'Passengers',
-      value: `${form.pax ?? 1}`,
+      value: `${paxCount} ${paxCount === 1 ? 'traveller' : 'travellers'}`,
+    },
+    {
+      icon: <FileText className="w-3.5 h-3.5" />,
+      label: 'Itinerary',
+      value: hasItinerary ? 'PNR itinerary attached' : 'No itinerary pasted',
     },
     ...(form.priceQuoted
       ? [{ icon: <span className="text-[11px] font-bold">$</span>, label: 'Quoted', value: `$${Number(form.priceQuoted).toLocaleString()}` }]
@@ -150,8 +137,38 @@ function ConfirmLeadModal({ isOpen, form, isSubmitting, submitError, onConfirm, 
           ))}
         </div>
 
-        {/* Stage & status pills */}
+        {/* Passenger details */}
+        {passengers.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ember-neutral">
+              <Users className="w-3 h-3 text-ember-primary" />
+              <span>Passenger Details</span>
+            </div>
+            <div className="rounded-xl border border-ember-border overflow-hidden divide-y divide-ember-border">
+              {passengers.slice(0, paxCount).map((p: any, i: number) => (
+                <div key={p.id || i} className="px-3 py-2 bg-ember-surface flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-ember-text-primary break-words">
+                      {[p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ') || `Passenger ${i + 1}`}
+                    </p>
+                    <p className="text-[11px] text-ember-neutral">
+                      {formatDob(p.dob)} · {p.gender || '—'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-ember-primary/10 text-ember-primary border border-ember-primary/20">
+                    {p.type || 'Adult'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Booking, stage & status pills */}
         <div className="flex flex-wrap gap-2">
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-ember-surface-raised text-ember-text-secondary border border-ember-border">
+            Booking: {form.bookingType}
+          </span>
           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-ember-primary/10 text-ember-primary border border-ember-primary/20">
             Stage: {form.stage}
           </span>
@@ -212,6 +229,9 @@ const EMPTY_BILLING: BillingFormValues = {
   card: EMPTY_CARD,
 };
 
+/** Sentinel for the "Unassigned" choice, distinct from '' (auto-assign). */
+const UNASSIGNED_VALUE = '__UNASSIGNED__';
+
 const EMPTY_FORM: LeadFormValues = {
   name: '',
   phoneDialCode: DEFAULT_COUNTRY_CODE,
@@ -227,10 +247,11 @@ const EMPTY_FORM: LeadFormValues = {
   bookingType: DEFAULT_BOOKING_TYPE,
   stage: 'New',
   status: DEFAULT_LEAD_STATUS,
-  assignedTo: '',
+  assignedTo: UNASSIGNED_VALUE,
   priceQuoted: '',
   nextFollowUpDate: '',
   initialNote: '',
+  pnrHtml: '',
   billing: EMPTY_BILLING,
 };
 
@@ -247,30 +268,11 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
 }) => {
   const { toast } = useToast();
   const [form, setForm] = useState<LeadFormValues>(EMPTY_FORM);
-  const [flightEntryMode, setFlightEntryMode] = useState<'pnr' | 'manual'>('pnr');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  const handlePNRParsed = useCallback((result: ParsePNRResult) => {
-    const { crmData } = result;
-    setForm((prev) => ({
-      ...prev,
-      name: prev.name && prev.name.trim() !== '' ? prev.name : crmData.name,
-      pax: crmData.pax,
-      passengers: crmData.passengers,
-      flightLegs: crmData.flightLegs,
-      origin: crmData.origin || prev.origin,
-      destination: crmData.destination || prev.destination,
-      travelDate: crmData.travelDate || prev.travelDate,
-      returnDate: crmData.returnDate ?? (crmData.tripType === 'One Way' ? '' : prev.returnDate),
-      tripType: crmData.tripType,
-      multiCityRoutes: crmData.multiCityRoutes,
-    }));
-    toast.success('PNR Converted', `Populated ${crmData.flightLegs.length} flight leg(s) & ${crmData.pax} passenger(s)`);
-  }, [toast]);
 
   // Keyed by the same dotted paths `validateLeadForm` reports, so a failed
   // submit can focus the offending control.
@@ -293,6 +295,33 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
 
   const setField = <K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  /**
+   * Store the pasted itinerary HTML and derive the route from it, so the leads
+   * table can show origin → destination without the user typing them.
+   */
+  const handlePnrHtmlChange = (html: string) => {
+    const { origin, destination } = extractRouteFromHtml(html);
+    setForm((f) => ({
+      ...f,
+      pnrHtml: html,
+      // Only overwrite when we actually found codes; keeps any manual value.
+      origin: origin || f.origin,
+      destination: destination || f.destination,
+    }));
+  };
+
+  /** Keep pax count and the derived lead `name` (from passenger[0]) in sync. */
+  const handlePassengersChange = (passengers: any[]) => {
+    const first = passengers[0] || {};
+    const derivedName = [first.firstName, first.lastName].filter(Boolean).join(' ');
+    setForm((f) => ({
+      ...f,
+      passengers,
+      pax: Math.max(1, passengers.length),
+      name: derivedName,
+    }));
+  };
 
   const setBilling = (patch: Partial<BillingFormValues>) =>
     setForm((f) => ({ ...f, billing: { ...(f.billing ?? EMPTY_BILLING), ...patch } }));
@@ -361,7 +390,11 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
         bookingType: form.bookingType,
         stage: form.stage,
         status: form.status,
-        assignedTo: form.assignedTo || undefined,
+        pnrHtml: form.pnrHtml || '',
+        assignedTo:
+          form.assignedTo === UNASSIGNED_VALUE
+            ? null
+            : form.assignedTo || undefined,
         priceQuoted: form.priceQuoted || 0,
         nextFollowUpDate: form.nextFollowUpDate || undefined,
         initialNote: form.initialNote,
@@ -436,7 +469,7 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
       onClose={handleClose}
       title="Add New Flight Lead"
       description="Enter passenger flight requirements. If unassigned and auto-assign is on, it will be round-robined."
-      width="2xl"
+      width="4xl"
       footer={
         <div className="flex items-center justify-between gap-3">
           {errorCount > 0 ? (
@@ -480,29 +513,6 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
           icon={<UserIcon className="w-3.5 h-3.5" />}
         >
           <FormRow cols={2}>
-            <Input
-              ref={registerField('name')}
-              label="Passenger Name"
-              required
-              placeholder="e.g. John Doe"
-              autoComplete="name"
-              value={String(form.name ?? '')}
-              onChange={(e) => {
-                const newName = lettersAndSpacesOnly(e.target.value);
-                const parts = newName.trim().split(/\s+/);
-                const first = parts[0] || '';
-                const last = parts.slice(1).join(' ') || '';
-                const updatedPax = [...(form.passengers || [])];
-                if (updatedPax.length === 0) {
-                  updatedPax.push({ id: `pax_${Date.now()}_0`, firstName: first, lastName: last, dob: '', gender: '' });
-                } else {
-                  updatedPax[0] = { ...updatedPax[0], firstName: first, lastName: last };
-                }
-                setForm((f) => ({ ...f, name: newName, passengers: updatedPax }));
-              }}
-              onBlur={blur('name')}
-              error={errorFor('name')}
-            />
             <PhoneField
               ref={registerField('phone')}
               label="Phone Number"
@@ -514,9 +524,6 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
               onBlur={blur('phone')}
               error={errorFor('phone')}
             />
-          </FormRow>
-
-          <FormRow cols={2}>
             <Input
               ref={registerField('email')}
               label="Email Address"
@@ -529,21 +536,22 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
               onBlur={blur('email')}
               error={errorFor('email')}
             />
-            <Select
-              label="Lead Source"
-              value={String(form.source ?? 'Website')}
-              onChange={(e) => setField('source', e.target.value)}
-            >
-              <option value="Website">Website</option>
-              <option value="Contact Us">Contact Us</option>
-              <option value="Referral">Referral</option>
-              <option value="Phone">Phone Inquiry</option>
-              <option value="Ads">Meta / Google Ads</option>
-              <option value="Newsletter">Newsletter</option>
-              <option value="Walk-in">Walk-in</option>
-              <option value="Other">Other</option>
-            </Select>
           </FormRow>
+
+          <Select
+            label="Lead Source"
+            value={String(form.source ?? 'Website')}
+            onChange={(e) => setField('source', e.target.value)}
+          >
+            <option value="Website">Website</option>
+            <option value="Contact Us">Contact Us</option>
+            <option value="Referral">Referral</option>
+            <option value="Phone">Phone Inquiry</option>
+            <option value="Ads">Meta / Google Ads</option>
+            <option value="Newsletter">Newsletter</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Other">Other</option>
+          </Select>
         </FormSection>
 
         {/* --------------------------------------------- Flight Details */}
@@ -552,38 +560,26 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
           description="Route, dates and itinerary requirements."
           icon={<Plane className="w-3.5 h-3.5" />}
         >
-          {/* PNR Converter Switch Box */}
-          <PNRConverterBox
-            mode={flightEntryMode}
-            onModeChange={setFlightEntryMode}
-            onParsed={handlePNRParsed}
-          />
+          {/* -------- Import Itinerary (paste converted HTML) */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide">
+              <FileText className="w-3.5 h-3.5 text-ember-primary" />
+              <span>Import Itinerary (PNR / GDS)</span>
+            </div>
+            <HtmlPnrConverter
+              value={String(form.pnrHtml ?? '')}
+              onChange={handlePnrHtmlChange}
+            />
+            {(form.origin || form.destination) && (
+              <p className="flex items-center gap-1.5 text-[11px] text-ember-primary font-semibold">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                Route detected: {form.origin || '—'} → {form.destination || '—'}
+              </p>
+            )}
+          </div>
 
-          <FormRow cols={3}>
-            <Select
-              label="Trip Type"
-              value={String(form.tripType ?? 'Round Trip')}
-              onChange={(e) => {
-                const tripType = e.target.value;
-                setForm((f) => ({
-                  ...f,
-                  tripType,
-                  returnDate: tripType === 'One Way' ? '' : f.returnDate,
-                  multiCityRoutes:
-                    tripType === 'Multi-City' && (!f.multiCityRoutes || f.multiCityRoutes.length === 0)
-                      ? [
-                          { id: `route_${Date.now()}_1`, origin: f.origin || '', destination: f.destination || '', travelDate: f.travelDate || '' },
-                          { id: `route_${Date.now()}_2`, origin: f.destination || '', destination: '', travelDate: '' },
-                        ]
-                      : f.multiCityRoutes,
-                }));
-              }}
-            >
-              <option value="Round Trip">Round Trip</option>
-              <option value="One Way">One Way</option>
-              <option value="Multi-City">Multi-City</option>
-            </Select>
-
+          {/* -------- Booking classification (always shown) */}
+          <FormRow cols={2}>
             <Select
               label="Booking Type"
               value={String(form.bookingType ?? DEFAULT_BOOKING_TYPE)}
@@ -611,425 +607,28 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
             </Select>
           </FormRow>
 
-          {/* If Multi-City Trip Type: Render Multi-City Route Builder */}
-          {form.tripType === 'Multi-City' ? (
-            <div className="space-y-2.5 p-3 rounded-btn bg-amber-500/5 border border-amber-500/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-xs text-ember-text-primary uppercase tracking-wide">
-                  <MapPin className="w-3.5 h-3.5 text-ember-primary" />
-                  <span>Multi-City Route Sectors (Customer Itinerary)</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentRoutes = (form.multiCityRoutes && form.multiCityRoutes.length > 0)
-                      ? form.multiCityRoutes
-                      : [
-                          { id: `route_${Date.now()}_1`, origin: form.origin || '', destination: form.destination || '', travelDate: form.travelDate || '' },
-                        ];
-                    const lastRoute = currentRoutes[currentRoutes.length - 1];
-                    const nextRoute = {
-                      id: `route_${Date.now()}_${currentRoutes.length + 1}`,
-                      origin: lastRoute?.destination || '',
-                      destination: '',
-                      travelDate: '',
-                    };
-                    const updated = [...currentRoutes, nextRoute];
-                    setForm((f) => ({
-                      ...f,
-                      multiCityRoutes: updated,
-                      origin: updated[0]?.origin || f.origin,
-                      destination: updated[updated.length - 1]?.destination || f.destination,
-                    }));
-                  }}
-                  className="px-2.5 py-1 rounded bg-ember-primary text-white text-[11px] font-bold hover:bg-ember-primary/90 transition-colors flex items-center gap-1 shadow-sm"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add Sector
-                </button>
-              </div>
+          {/* Flight route/date details removed — itinerary is captured via the
+              PNR HTML above. Origin/destination/dates default on the server. */}
 
-              {((form.multiCityRoutes && form.multiCityRoutes.length > 0)
-                ? form.multiCityRoutes
-                : [
-                    { id: `route_${Date.now()}_1`, origin: form.origin || '', destination: '', travelDate: form.travelDate || '' },
-                    { id: `route_${Date.now()}_2`, origin: '', destination: form.destination || '', travelDate: '' },
-                  ]
-              ).map((route: any, rIdx: number, allRoutes: any[]) => (
-                <div key={route.id || rIdx} className="p-2.5 rounded-btn bg-ember-surface-raised border border-ember-border text-xs space-y-2">
-                  <div className="flex items-center justify-between font-bold text-ember-primary text-[11px]">
-                    <span>Sector {rIdx + 1}: {route.origin || 'Origin'} → {route.destination || 'Destination'}</span>
-                    {allRoutes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = allRoutes.filter((_: any, i: number) => i !== rIdx);
-                          setForm((f) => ({
-                            ...f,
-                            multiCityRoutes: updated,
-                            origin: updated[0]?.origin || '',
-                            destination: updated[updated.length - 1]?.destination || '',
-                          }));
-                        }}
-                        className="text-ember-neutral hover:text-red-600 transition-colors text-[10px] font-bold"
-                      >
-                        Remove Sector
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <AirportInput
-                      label={`From (Sector ${rIdx + 1})`}
-                      placeholder="e.g. New York, JFK"
-                      value={route.origin || ''}
-                      onChange={(val) => {
-                        const updated = [...allRoutes];
-                        updated[rIdx] = { ...route, origin: val };
-                        setForm((f) => ({
-                          ...f,
-                          multiCityRoutes: updated,
-                          origin: updated[0]?.origin || f.origin,
-                        }));
-                      }}
-                    />
-                    <AirportInput
-                      label={`To (Sector ${rIdx + 1})`}
-                      placeholder="e.g. London, LHR"
-                      value={route.destination || ''}
-                      onChange={(val) => {
-                        const updated = [...allRoutes];
-                        updated[rIdx] = { ...route, destination: val };
-                        setForm((f) => ({
-                          ...f,
-                          multiCityRoutes: updated,
-                          destination: updated[updated.length - 1]?.destination || f.destination,
-                        }));
-                      }}
-                    />
-                    <Input
-                      label="Departure Date"
-                      type="date"
-                      value={route.travelDate || ''}
-                      onChange={(e) => {
-                        const updated = [...allRoutes];
-                        updated[rIdx] = { ...route, travelDate: e.target.value };
-                        setForm((f) => ({
-                          ...f,
-                          multiCityRoutes: updated,
-                          travelDate: rIdx === 0 ? e.target.value : f.travelDate,
-                        }));
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
-              <FormRow cols={2}>
-                <AirportInput
-                  ref={registerField('origin')}
-                  label="Origin (Airport / City)"
-                  required
-                  placeholder="e.g. New York, JFK…"
-                  value={String(form.origin ?? '')}
-                  onChange={(v) => setField('origin', v)}
-                  onBlur={blur('origin')}
-                  error={errorFor('origin')}
-                />
-                <AirportInput
-                  ref={registerField('destination')}
-                  label="Destination (Airport / City)"
-                  required
-                  placeholder="e.g. London, LHR…"
-                  value={String(form.destination ?? '')}
-                  onChange={(v) => setField('destination', v)}
-                  onBlur={blur('destination')}
-                  error={errorFor('destination')}
-                />
-              </FormRow>
-
-              <FormRow cols={2}>
-                <Input
-                  ref={registerField('travelDate')}
-                  label="Travel Date"
-                  type="date"
-                  value={String(form.travelDate ?? '')}
-                  onChange={(e) => setField('travelDate', e.target.value)}
-                  onBlur={blur('travelDate')}
-                  error={errorFor('travelDate')}
-                />
-                <Input
-                  ref={registerField('returnDate')}
-                  label="Return Date"
-                  type="date"
-                  min={String(form.travelDate ?? '') || undefined}
-                  disabled={form.tripType === 'One Way'}
-                  value={String(form.returnDate ?? '')}
-                  onChange={(e) => setField('returnDate', e.target.value)}
-                  onBlur={blur('returnDate')}
-                  error={errorFor('returnDate')}
-                />
-              </FormRow>
-            </>
-          )}
-
-          {/* Pax Counter & Controls */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-ember-text-primary">Pax (Travelers)</label>
-              <span className="text-[10px] text-ember-primary font-bold">
-                {Number(form.pax ?? 1)} Person{Number(form.pax ?? 1) > 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const current = Math.max(1, Number(form.pax ?? 1));
-                  if (current > 1) {
-                    const next = current - 1;
-                    const updated = (form.passengers || []).slice(0, next);
-                    setForm((f) => ({ ...f, pax: next, passengers: updated }));
-                  }
-                }}
-                className="w-9 h-[38px] rounded-btn bg-ember-surface-raised border border-ember-border hover:bg-ember-surface text-ember-text-primary font-bold flex items-center justify-center transition-colors text-base"
-              >
-                −
-              </button>
-              <input
-                ref={registerField('pax')}
-                type="number"
-                min={1}
-                max={99}
-                value={String(form.pax ?? 1)}
-                onChange={(e) => {
-                  const next = Math.max(1, parseInt(e.target.value) || 1);
-                  let updated = [...(form.passengers || [])];
-                  if (updated.length < next) {
-                    for (let i = updated.length; i < next; i++) {
-                      updated.push({
-                        id: `pax_${Date.now()}_${i}`,
-                        firstName: '',
-                        lastName: '',
-                        dob: '',
-                        gender: '',
-                      });
-                    }
-                  } else if (updated.length > next) {
-                    updated = updated.slice(0, next);
-                  }
-                  setForm((f) => ({ ...f, pax: next, passengers: updated }));
-                }}
-                onBlur={blur('pax')}
-                className="flex-1 text-center h-[38px] px-2 bg-ember-surface-raised border border-ember-border rounded-input text-sm font-bold text-ember-text-primary focus:outline-none focus:border-ember-primary"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const current = Math.max(1, Number(form.pax ?? 1));
-                  const next = current + 1;
-                  const updated = [
-                    ...(form.passengers || []),
-                    {
-                      id: `pax_${Date.now()}_${next}`,
-                      firstName: '',
-                      lastName: '',
-                      dob: '',
-                      gender: '',
-                    },
-                  ];
-                  setForm((f) => ({ ...f, pax: next, passengers: updated }));
-                }}
-                className="w-9 h-[38px] rounded-btn bg-ember-surface-raised border border-ember-border hover:bg-ember-surface text-ember-text-primary font-bold flex items-center justify-center transition-colors text-base"
-              >
-                +
-              </button>
-            </div>
+          {/* -------- Passengers */}
+          <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide pt-1">
+            <Users className="w-3.5 h-3.5 text-ember-primary" />
+            <span>Passengers &amp; Pax Details</span>
           </div>
 
-          {/* Quick Pax Selection Chips */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-ember-neutral uppercase tracking-wider">Quick Select:</span>
-            {[1, 2, 3, 4, 5, 6, 8, 10].map((num) => {
-              const currentPax = Number(form.pax ?? 1);
-              const isSelected = currentPax === num;
-              return (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => {
-                    let updated = [...(form.passengers || [])];
-                    if (updated.length < num) {
-                      for (let i = updated.length; i < num; i++) {
-                        updated.push({
-                          id: `pax_${Date.now()}_${i}`,
-                          firstName: '',
-                          lastName: '',
-                          dob: '',
-                          gender: '',
-                        });
-                      }
-                    } else if (updated.length > num) {
-                      updated = updated.slice(0, num);
-                    }
-                    setForm((f) => ({ ...f, pax: num, passengers: updated }));
-                  }}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-all ${
-                    isSelected
-                      ? 'bg-ember-primary text-white border-ember-primary shadow-sm scale-105'
-                      : 'bg-ember-surface-raised border-ember-border text-ember-neutral hover:text-ember-text-primary hover:border-ember-primary/40'
-                  }`}
-                >
-                  {num} Pax
-                </button>
-              );
-            })}
-          </div>
+          <PassengerList
+            passengers={
+              (form.passengers && form.passengers.length > 0)
+                ? form.passengers
+                : [{ id: `pax_${Date.now()}_0`, firstName: '', middleName: '', lastName: '', type: 'Adult', dob: '', gender: '' }]
+            }
+            onChange={handlePassengersChange}
+            errorFor={errorFor}
+            onFieldBlur={(key) => setTouched((t) => ({ ...t, [key]: true }))}
+            registerField={registerField}
+          />
 
-          {/* Optional Individual Passenger Form Cards */}
-          {Number(form.pax ?? 1) > 1 && (
-            <div className="space-y-2 pt-2 border-t border-ember-border/60">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ember-text-primary uppercase tracking-wide flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-ember-primary" />
-                  <span>Passenger Details List ({Number(form.pax ?? 1)} Travelers)</span>
-                </span>
-                <span className="text-[11px] text-ember-neutral">Letters only for names</span>
-              </div>
-
-              <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
-                {Array.from({ length: Number(form.pax ?? 1) }).map((_, idx) => {
-                  const p = (form.passengers && form.passengers[idx]) || {};
-                  return (
-                    <div key={idx} className="p-3 rounded-btn bg-ember-surface-raised border border-ember-border text-xs space-y-2">
-                      <div className="flex items-center justify-between font-bold text-ember-primary text-[11px]">
-                        <span>Passenger {idx + 1} {idx === 0 ? '(Primary Lead Traveler)' : ''}</span>
-                        {idx > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = (form.passengers || []).filter((_: any, i: number) => i !== idx);
-                              setForm((f) => ({ ...f, passengers: updated, pax: Math.max(1, Number(f.pax ?? 1) - 1) }));
-                            }}
-                            className="text-ember-neutral hover:text-red-600 transition-colors text-[10px] font-bold"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-bold text-ember-neutral mb-0.5">First Name</label>
-                          <input
-                            type="text"
-                            placeholder={idx === 0 ? (form.name?.split(' ')[0] || 'First name') : `First name`}
-                            value={p.firstName ?? ''}
-                            onChange={(e) => {
-                              const cleanVal = lettersAndSpacesOnly(e.target.value);
-                              const updated = [...(form.passengers || [])];
-                              while (updated.length <= idx) {
-                                updated.push({ id: `pax_${Date.now()}_${updated.length}`, firstName: '', lastName: '', dob: '', gender: '' });
-                              }
-                              updated[idx] = { ...updated[idx], firstName: cleanVal };
-                              if (idx === 0) {
-                                const newFullName = [cleanVal, updated[0].lastName].filter(Boolean).join(' ');
-                                setForm((f) => ({ ...f, name: newFullName, passengers: updated }));
-                              } else {
-                                setForm((f) => ({ ...f, passengers: updated }));
-                              }
-                            }}
-                            className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-ember-neutral mb-0.5">Last Name</label>
-                          <input
-                            type="text"
-                            placeholder={idx === 0 ? (form.name?.split(' ').slice(1).join(' ') || 'Last name') : `Last name`}
-                            value={p.lastName ?? ''}
-                            onChange={(e) => {
-                              const cleanVal = lettersAndSpacesOnly(e.target.value);
-                              const updated = [...(form.passengers || [])];
-                              while (updated.length <= idx) {
-                                updated.push({ id: `pax_${Date.now()}_${updated.length}`, firstName: '', lastName: '', dob: '', gender: '' });
-                              }
-                              updated[idx] = { ...updated[idx], lastName: cleanVal };
-                              if (idx === 0) {
-                                const newFullName = [updated[0].firstName, cleanVal].filter(Boolean).join(' ');
-                                setForm((f) => ({ ...f, name: newFullName, passengers: updated }));
-                              } else {
-                                setForm((f) => ({ ...f, passengers: updated }));
-                              }
-                            }}
-                            className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-bold text-ember-neutral mb-0.5">Date of Birth</label>
-                          <input
-                            type="date"
-                            value={p.dob ?? ''}
-                            onChange={(e) => {
-                              const updated = [...(form.passengers || [])];
-                              while (updated.length <= idx) {
-                                updated.push({ firstName: '', lastName: '', dob: '', gender: '' });
-                              }
-                              updated[idx] = { ...updated[idx], dob: e.target.value };
-                              setForm((f) => ({ ...f, passengers: updated }));
-                            }}
-                            className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-ember-neutral mb-0.5">Gender</label>
-                          <select
-                            value={p.gender ?? ''}
-                            onChange={(e) => {
-                              const updated = [...(form.passengers || [])];
-                              while (updated.length <= idx) {
-                                updated.push({ firstName: '', lastName: '', dob: '', gender: '' });
-                              }
-                              updated[idx] = { ...updated[idx], gender: e.target.value };
-                              setForm((f) => ({ ...f, passengers: updated }));
-                            }}
-                            className="w-full px-2.5 py-1.5 rounded-input bg-ember-surface border border-ember-border text-xs text-ember-text-primary focus:outline-none focus:border-ember-primary font-medium"
-                          >
-                            <option value="">Select Gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <FormRow cols={3}>
-            <Select
-              label="Trip Type"
-              value={String(form.tripType ?? 'Round Trip')}
-              onChange={(e) => {
-                const tripType = e.target.value;
-                // A one-way trip can't carry a return date.
-                setForm((f) => ({
-                  ...f,
-                  tripType,
-                  returnDate: tripType === 'One Way' ? '' : f.returnDate,
-                }));
-              }}
-            >
-              <option value="Round Trip">Round Trip</option>
-              <option value="One Way">One Way</option>
-              <option value="Multi-City">Multi-City</option>
-            </Select>
-
+          <FormRow cols={2}>
             <Select
               label="Initial Stage"
               value={String(form.stage ?? 'New')}
@@ -1075,6 +674,7 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
                 onChange={(e) => setField('assignedTo', e.target.value)}
               >
                 <option value="">Auto-Assign (Round-Robin)</option>
+                <option value={UNASSIGNED_VALUE}>Unassigned (No Staff)</option>
                 {staffList
                   .filter((s) => s.active)
                   .map((staff) => (

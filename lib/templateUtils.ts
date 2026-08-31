@@ -9,6 +9,7 @@
 import AirPortData from '@/data/airportSData';
 import AirlineOptimizeData from '@/data/AirportOptimizeData.json';
 import { resolveDateTime } from '@/lib/pnr/enricher';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 // Lazy airport map cache
 let airportMap: Map<string, { airportName: string; cityName: string; countryName: string }> | null = null;
@@ -313,6 +314,35 @@ export function buildItineraryHtml(lead: any): string {
 }
 
 /**
+ * Returns the real flight itinerary HTML for the email.
+ *
+ * Preferred source is the itinerary the agent pasted on the lead
+ * (`lead.pnrHtml`, from pnrconverter.com). We sanitize it and wrap it so it
+ * renders cleanly inside the branded email. When a lead has no pasted PNR HTML
+ * (older records), we fall back to the legacy synthetic table so the email
+ * still shows something.
+ */
+export function buildPnrItineraryHtml(lead: any): string {
+  const raw = lead?.pnrHtml;
+  if (raw && String(raw).trim()) {
+    const safe = sanitizeHtml(String(raw));
+    // Wrapper keeps the itinerary contained and readable in email clients while
+    // leaving the pasted markup (tables/logos/inline styles) intact.
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; border:1px solid #E2ECFB; border-radius:8px; margin-bottom:24px; background:#ffffff; overflow:hidden;">
+        <tr>
+          <td style="padding:14px 16px;">
+            ${safe}
+          </td>
+        </tr>
+      </table>
+    `;
+  }
+  // Legacy fallback for leads created before PNR HTML capture.
+  return buildItineraryHtml(lead);
+}
+
+/**
  * Dynamically builds HTML table rows for passengers with DOB, Gender, and PNR.
  */
 export function buildPassengersHtml(lead: any): string {
@@ -514,6 +544,8 @@ export function buildTemplateVariables(
     // Dynamic HTML Sections
     passengers_rows_html: buildPassengersHtml(lead),
     itinerary_legs_html: buildItineraryHtml(lead),
+    // Real pasted PNR itinerary (preferred); falls back to the synthetic table.
+    pnr_itinerary_html: buildPnrItineraryHtml(lead),
     contact_details_html: buildContactDetailsHtml(lead),
 
     // Itinerary

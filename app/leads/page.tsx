@@ -424,7 +424,7 @@ function LeadsContent() {
                           day: 'numeric',
                           year: 'numeric',
                         })
-                      : 'Date Flexible';
+                      : '';
 
                     const refNo =
                       lead.referenceNumber ||
@@ -498,9 +498,11 @@ function LeadsContent() {
                             <Plane className="w-3.5 h-3.5 text-ember-primary rotate-90" />
                             <span>{lead.destination}</span>
                           </div>
-                          <div className="text-xs text-ember-text-secondary mt-1">
-                            {travelDateFormatted}
-                          </div>
+                          {travelDateFormatted && (
+                            <div className="text-xs text-ember-text-secondary mt-1">
+                              {travelDateFormatted}
+                            </div>
+                          )}
                           <div className="text-xs text-ember-text-secondary">
                             {lead.pax} Passenger{lead.pax !== 1 ? 's' : ''}
                           </div>

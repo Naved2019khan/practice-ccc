@@ -50,12 +50,13 @@ import { LeadAttachmentsManager } from '@/components/leads/LeadAttachmentsManage
 import { LeadTrackingFeed } from '@/components/leads/LeadTrackingFeed';
 import { LeadEmailComposerModal } from '@/components/leads/LeadEmailComposerModal';
 import { LeadBillingManager } from '@/components/leads/LeadBillingManager';
+import { LeadSpecsPanel } from '@/components/leads/LeadSpecsPanel';
 import { useToast } from '@/context/ToastContext';
 import { buildTemplateVariables, substituteTemplateVariables } from '@/lib/templateUtils';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { lettersAndSpacesOnly } from '@/lib/validation';
-import { PNRConverterBox } from '@/components/leads/PNRConverterBox';
-import { type ParsePNRResult } from '@/lib/pnr';
+import { HtmlPnrConverter } from '@/components/leads/HtmlPnrConverter';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { resolveDateTime } from '@/lib/pnr/enricher';
 import {
   BOOKING_TYPES,
@@ -86,29 +87,9 @@ export default function LeadDetailPage() {
 
   // Edit Specs State
   const [isEditingSpecs, setIsEditingSpecs] = useState(false);
-  const [editFlightEntryMode, setEditFlightEntryMode] = useState<'pnr' | 'manual'>('pnr');
   const [editForm, setEditForm] = useState<any>({});
   const [isSavingSpecs, setIsSavingSpecs] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
-
-  const handleEditPNRParsed = (result: ParsePNRResult) => {
-    const { crmData } = result;
-    setEditForm((prev: any) => ({
-      ...prev,
-      name: prev.name && prev.name.trim() !== '' ? prev.name : crmData.name,
-      pax: crmData.pax,
-      passengers: crmData.passengers,
-      flightLegs: crmData.flightLegs,
-      origin: crmData.origin || prev.origin,
-      destination: crmData.destination || prev.destination,
-      travelDate: crmData.travelDate || prev.travelDate,
-      returnDate: crmData.returnDate ?? (crmData.tripType === 'One Way' ? '' : prev.returnDate),
-      tripType: crmData.tripType,
-      multiCityRoutes: crmData.multiCityRoutes,
-      pnr: crmData.pnr || prev.pnr,
-    }));
-    toast.success('PNR Converted', `Populated ${crmData.flightLegs.length} flight leg(s) & ${crmData.pax} passenger(s)`);
-  };
 
   // Note composer state
   const [newNoteText, setNewNoteText] = useState('');
@@ -176,6 +157,7 @@ export default function LeadDetailPage() {
         status: data.lead.status || 'Open',
         paymentStatus: data.lead.paymentStatus,
         pnr: data.lead.pnr || '',
+        pnrHtml: data.lead.pnrHtml || '',
         ticketNumber: data.lead.ticketNumber || '',
         invoiceNumber: data.lead.invoiceNumber || '',
         priceQuoted: data.lead.priceQuoted || '',
@@ -281,10 +263,28 @@ export default function LeadDetailPage() {
     try {
       const derivedPax =
         editForm.passengers?.length > 0 ? editForm.passengers.length : editForm.pax || 1;
+
+      // Normalize the folded-in billing card: the API expects expiryMonth /
+      // expiryYear, but the edit form captures a single MM/YY string.
+      let billing = editForm.billing;
+      if (billing?.card) {
+        const c = { ...billing.card };
+        if (typeof c.expiry === 'string' && c.expiry.includes('/')) {
+          const [mm, yy] = c.expiry.split('/').map((s: string) => s.trim());
+          const m = parseInt(mm, 10);
+          const y = parseInt(yy, 10);
+          if (!Number.isNaN(m)) c.expiryMonth = m;
+          if (!Number.isNaN(y)) c.expiryYear = y < 100 ? 2000 + y : y;
+        }
+        billing = { ...billing, card: c };
+      }
+
       const res = await fetch(`/api/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editForm, pax: derivedPax }),
+        // tripType/flightLegs/multiCityRoutes are no longer edited here; the
+        // server derives origin/destination from pnrHtml.
+        body: JSON.stringify({ ...editForm, billing, pax: derivedPax }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save flight details');
@@ -673,7 +673,112 @@ export default function LeadDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Col: Flight Specifications, Passenger Info & Billing */}
           <div className="space-y-4">
-            {isEditingSpecs ? (
+            <LeadSpecsPanel
+              lead={lead}
+              isEditing={isEditingSpecs}
+              onStartEdit={() => {
+                setEditForm({
+                  name: lead.name || '',
+                  phone: lead.phone || '',
+                  email: lead.email || '',
+                  source: lead.source,
+                  origin: lead.origin || '',
+                  destination: lead.destination || '',
+                  pax: lead.pax || 1,
+                  bookingType: lead.bookingType || 'New Booking',
+                  status: lead.status || 'Open',
+                  stage: lead.stage || 'New',
+                  paymentStatus: lead.paymentStatus || 'Pending',
+                  priceQuoted: lead.priceQuoted || '',
+                  currency: lead.currency || 'USD',
+                  pnr: lead.pnr || '',
+                  pnrHtml: lead.pnrHtml || '',
+                  ticketNumber: lead.ticketNumber || '',
+                  invoiceNumber: lead.invoiceNumber || '',
+                  nextFollowUpDate: lead.nextFollowUpDate ? lead.nextFollowUpDate.split('T')[0] : '',
+                  passengers: lead.passengers || [],
+                  billing: lead.billing || {},
+                  remarks: lead.remarks || lead.initialNote || '',
+                  initialNote: lead.initialNote || lead.remarks || '',
+                });
+                setIsEditingSpecs(true);
+              }}
+              onCancelEdit={() => setIsEditingSpecs(false)}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              onSubmit={handleSaveSpecs}
+              isSaving={isSavingSpecs}
+              currentUser={currentUser}
+              staffList={staffList}
+              onReassign={handleReassign}
+            />
+
+            {/* ── Sent Emails ── */}
+            {(() => {
+              const sentEvents = (lead.customerPortal?.history || []).filter(
+                (h: any) => h.event === 'email_sent'
+              );
+              const lastSentAt = lead.customerPortal?.lastSentAt;
+              const hasSent = sentEvents.length > 0 || !!lastSentAt;
+              return (
+                <Card elevated className="space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-ember-border">
+                    <div className="flex items-center gap-2">
+                      <Send className="w-4 h-4 text-ember-primary" />
+                      <h3 className="text-sm font-bold font-display text-ember-text-primary">Sent Emails</h3>
+                    </div>
+                    {hasSent ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        {sentEvents.length || 1} sent
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-stone-500 bg-stone-100 px-2 py-0.5 rounded border border-stone-300">
+                        Not emailed yet
+                      </span>
+                    )}
+                  </div>
+
+                  {!hasSent ? (
+                    <p className="text-xs text-ember-neutral italic">
+                      No emails have been sent to this customer yet. Use the Email tab to send one.
+                    </p>
+                  ) : (
+                    <>
+                      {lastSentAt && (
+                        <div className="text-xs text-ember-text-secondary">
+                          <span className="font-semibold text-ember-text-primary">Last sent:</span>{' '}
+                          {lead.customerPortal?.lastSentSubject || 'Itinerary email'} ·{' '}
+                          {new Date(lastSentAt).toLocaleString()}
+                          {lead.customerPortal?.lastSentBy ? ` · by ${lead.customerPortal.lastSentBy}` : ''}
+                          {lead.customerPortal?.lastSentTo ? ` · to ${lead.customerPortal.lastSentTo}` : ''}
+                        </div>
+                      )}
+                      {sentEvents.length > 0 && (
+                        <div className="space-y-1.5">
+                          {sentEvents.slice().reverse().map((ev: any, i: number) => (
+                            <div key={ev.id || i} className="flex items-start justify-between gap-3 p-2 rounded-btn bg-ember-surface-raised border border-ember-border text-xs">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <Mail className="w-3.5 h-3.5 text-ember-primary shrink-0 mt-0.5" />
+                                <span className="text-ember-text-primary break-words">{ev.description || 'Email sent'}</span>
+                              </div>
+                              <span className="text-[10px] text-ember-neutral whitespace-nowrap shrink-0">
+                                {new Date(ev.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-ember-neutral">
+                        Full open/click telemetry is in the Tracking &amp; Telemetry tab.
+                      </p>
+                    </>
+                  )}
+                </Card>
+              );
+            })()}
+
+            {false && (isEditingSpecs ? (
               <Card elevated className="space-y-3">
                 <h3 className="text-sm font-bold font-display text-ember-text-primary">
                   Edit Flight Requirements
@@ -707,23 +812,6 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
 
-                  <Input
-                    label="Passenger Name"
-                    value={editForm.name}
-                    onChange={(e) => {
-                      const fullName = lettersAndSpacesOnly(e.target.value);
-                      const parts = fullName.trim().split(' ');
-                      const firstName = parts[0] || '';
-                      const lastName = parts.slice(1).join(' ') || '';
-                      // Keep pax[0] in sync
-                      const updatedPassengers = [...(editForm.passengers || [])];
-                      if (updatedPassengers.length > 0) {
-                        updatedPassengers[0] = { ...updatedPassengers[0], firstName, lastName };
-                      }
-                      setEditForm({ ...editForm, name: fullName, passengers: updatedPassengers });
-                    }}
-                    required
-                  />
                   {/* Pax Counter with Stepper & Quick Presets */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -762,7 +850,9 @@ export default function LeadDetailPage() {
                                   updated.push({
                                     id: `pax_${Date.now()}_${i}`,
                                     firstName: i === 0 ? editForm.name?.split(' ')[0] || '' : `Passenger ${i + 1}`,
+                                    middleName: '',
                                     lastName: i === 0 ? editForm.name?.split(' ').slice(1).join(' ') || '' : '',
+                                    type: 'Adult',
                                     dob: '',
                                     gender: '',
                                   });
@@ -784,7 +874,9 @@ export default function LeadDetailPage() {
                                 {
                                   id: `pax_${Date.now()}_${next}`,
                                   firstName: `Passenger ${next}`,
+                                  middleName: '',
                                   lastName: '',
+                                  type: 'Adult',
                                   dob: '',
                                   gender: '',
                                 },
@@ -821,44 +913,6 @@ export default function LeadDetailPage() {
                       </Select>
                     </div>
 
-                    {/* Quick Pax Selection Chips */}
-                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                      <span className="text-[10px] font-bold text-ember-neutral uppercase tracking-wider">Quick Select:</span>
-                      {[1, 2, 3, 4, 5, 6, 8, 10].map((num) => {
-                        const currentPax = (editForm.passengers || []).length || editForm.pax || 1;
-                        const isSelected = currentPax === num;
-                        return (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={() => {
-                              let updated = [...(editForm.passengers || [])];
-                              if (updated.length < num) {
-                                for (let i = updated.length; i < num; i++) {
-                                  updated.push({
-                                    id: `pax_${Date.now()}_${i}`,
-                                    firstName: i === 0 ? editForm.name?.split(' ')[0] || '' : `Passenger ${i + 1}`,
-                                    lastName: i === 0 ? editForm.name?.split(' ').slice(1).join(' ') || '' : '',
-                                    dob: '',
-                                    gender: '',
-                                  });
-                                }
-                              } else if (updated.length > num) {
-                                updated = updated.slice(0, num);
-                              }
-                              setEditForm({ ...editForm, passengers: updated, pax: num });
-                            }}
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-all ${
-                              isSelected
-                                ? 'bg-ember-primary text-white border-ember-primary shadow-sm scale-105'
-                                : 'bg-ember-surface-raised border-ember-border text-ember-neutral hover:text-ember-text-primary hover:border-ember-primary/40'
-                            }`}
-                          >
-                            {num} Pax
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
@@ -925,7 +979,7 @@ export default function LeadDetailPage() {
                           const lastName = nameParts.slice(1).join(' ') || '';
                           const updated = [
                             ...(editForm.passengers || []),
-                            { id: `pax_${Date.now()}`, firstName, lastName, dob: '', gender: '' },
+                            { id: `pax_${Date.now()}`, firstName, middleName: '', lastName, type: 'Adult', dob: '', gender: '' },
                           ];
                           setEditForm({ ...editForm, passengers: updated, pax: updated.length });
                         }}
@@ -957,7 +1011,7 @@ export default function LeadDetailPage() {
                           </button>
                         </div>
                         <div className="p-3 space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             <Input
                               label="First Name"
                               placeholder="First name (letters only)..."
@@ -972,6 +1026,17 @@ export default function LeadDetailPage() {
                                   // Keep lead name in sync with pax[0]
                                   ...(idx === 0 && { name: [cleanVal, pax.lastName].filter(Boolean).join(' ') }),
                                 });
+                              }}
+                            />
+                            <Input
+                              label="Middle Name"
+                              placeholder="Middle name (letters only)..."
+                              value={pax.middleName || ''}
+                              onChange={(e) => {
+                                const cleanVal = lettersAndSpacesOnly(e.target.value);
+                                const updated = [...editForm.passengers];
+                                updated[idx] = { ...pax, middleName: cleanVal };
+                                setEditForm({ ...editForm, passengers: updated });
                               }}
                             />
                             <Input
@@ -991,7 +1056,20 @@ export default function LeadDetailPage() {
                               }}
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            <Select
+                              label="Passenger Type"
+                              value={pax.type || 'Adult'}
+                              onChange={(e) => {
+                                const updated = [...editForm.passengers];
+                                updated[idx] = { ...pax, type: e.target.value };
+                                setEditForm({ ...editForm, passengers: updated });
+                              }}
+                            >
+                              <option value="Adult">Adult</option>
+                              <option value="Child">Child</option>
+                              <option value="Infant">Infant</option>
+                            </Select>
                             <Input
                               label="Date of Birth"
                               type="date"
@@ -1049,11 +1127,10 @@ export default function LeadDetailPage() {
 
                   {/* ── Flight Detail ────────────────────────────────── */}
                   <div className="pt-3 border-t border-ember-border space-y-3">
-                    {/* PNR Converter Switch Box */}
-                    <PNRConverterBox
-                      mode={editFlightEntryMode}
-                      onModeChange={setEditFlightEntryMode}
-                      onParsed={handleEditPNRParsed}
+                    {/* PNR Converter — paste HTML from pnrconverter.com */}
+                    <HtmlPnrConverter
+                      value={String(editForm.pnrHtml ?? '')}
+                      onChange={(html) => setEditForm({ ...editForm, pnrHtml: html })}
                     />
 
                     <div className="flex items-center justify-between">
@@ -1929,6 +2006,37 @@ export default function LeadDetailPage() {
                         ))}
                       </>
                     )}
+
+                    {/* PNR converter HTML itinerary (read-only preview) */}
+                    {lead.pnrHtml && lead.pnrHtml.trim() && (
+                      <div className="pt-2 mt-1 border-t border-ember-border space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-ember-neutral">
+                          <FileText className="w-3 h-3 text-ember-primary" />
+                          <span>PNR Itinerary (Converted)</span>
+                        </div>
+                        <div className="rounded-btn border border-ember-border bg-white p-3 max-h-[360px] overflow-auto shadow-inner">
+                          {/<\/?[a-z][\s\S]*>/i.test(lead.pnrHtml) ? (
+                            <>
+                              <style>{`
+                                .pnr-html-preview table { border-collapse: collapse; width: 100%; font-size: 12px; }
+                                .pnr-html-preview th, .pnr-html-preview td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
+                                .pnr-html-preview thead th, .pnr-html-preview th { background: #f5f5f4; font-weight: 700; }
+                                .pnr-html-preview img { max-width: 100%; height: auto; }
+                                .pnr-html-preview a { color: #b45309; text-decoration: underline; }
+                              `}</style>
+                              <div
+                                className="pnr-html-preview text-xs text-ember-text-primary"
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(lead.pnrHtml) }}
+                              />
+                            </>
+                          ) : (
+                            <pre className="whitespace-pre-wrap break-words font-mono text-xs text-ember-text-primary m-0">
+                              {lead.pnrHtml}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Assigned Agent Box */}
@@ -1984,7 +2092,7 @@ export default function LeadDetailPage() {
                   }}
                 />
               </div>
-            )}
+            ))}
           </div>
 
           {/* Right Col: Tabs Workspace (Email Composer, Notes, Tracking & Activity, Tasks) */}
@@ -2089,32 +2197,17 @@ export default function LeadDetailPage() {
                   placeholder="Flight quotation & options..."
                 />
 
-                {/* Editor & Live Rendered Split View */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold text-ember-text-primary">
-                      <span>HTML Body Source</span>
-                      <span className="text-[11px] text-ember-neutral">Placeholders supported</span>
-                    </div>
-                    <textarea
-                      rows={12}
-                      value={emailBodyHtml}
-                      onChange={(e) => setEmailBodyHtml(e.target.value)}
-                      className="w-full bg-stone-900 text-stone-100 font-code text-xs p-3 rounded-input border border-stone-700 focus:outline-none focus:border-ember-primary"
-                    />
+                {/* Live Rendered Client Preview */}
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-ember-text-primary">
+                    <span>Live Rendered Client Preview</span>
+                    <span className="text-[11px] text-emerald-700 font-bold">1x1 Pixel Active</span>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold text-ember-text-primary">
-                      <span>Live Rendered Client Preview</span>
-                      <span className="text-[11px] text-emerald-700 font-bold">1x1 Pixel Active</span>
-                    </div>
-                    <div className="w-full h-[260px] bg-white border border-ember-border rounded-input overflow-y-auto p-3 shadow-inner">
-                      <div
-                        dangerouslySetInnerHTML={{ __html: emailBodyHtml }}
-                        className="text-xs"
-                      />
-                    </div>
+                  <div className="w-full h-[360px] bg-white border border-ember-border rounded-input overflow-auto p-3 shadow-inner">
+                    <div
+                      dangerouslySetInnerHTML={{ __html: emailBodyHtml }}
+                      className="text-xs [&_table]:max-w-full [&_img]:max-w-full [&_img]:h-auto break-words"
+                    />
                   </div>
                 </div>
 
