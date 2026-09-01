@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { Lead } from '@/models/Lead';
-import { parseUserAgent, getClientIp, resolveIpLocation } from '@/lib/tracking';
+import { parseUserAgent, getClientIp, resolveIpLocation, resolveIpDetails } from '@/lib/tracking';
 import { sendEmail } from '@/lib/email';
 import mongoose from 'mongoose';
 
@@ -27,26 +27,221 @@ async function sendWithSingleRetry(opts: { to: string; subject: string; html: st
 }
 
 /** Builds the CS-team notification email body from the visited lead. */
-function buildCsNotificationHtml(lead: any, visit: { ip: string; location: string; device: string; at: Date }): string {
+function buildCsNotificationHtml(
+  lead: any,
+  visit: {
+    ip: string;
+    city?: string;
+    region?: string;
+    country?: string;
+    location: string;
+    browser?: string;
+    os?: string;
+    device?: string;
+    summary: string;
+    at: Date;
+    crmUrl?: string;
+    portalUrl?: string;
+  }
+): string {
   const esc = (v: any) => String(v ?? '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const paxNames = Array.isArray(lead.passengers) && lead.passengers.length > 0
-    ? lead.passengers.map((p: any) => [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ')).filter(Boolean).join(', ')
-    : (lead.name || '—');
+  const paxNames =
+    Array.isArray(lead.passengers) && lead.passengers.length > 0
+      ? lead.passengers
+          .map((p: any) => [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' '))
+          .filter(Boolean)
+          .join(', ')
+      : lead.name || '—';
+
+  const leadIdShort = lead._id ? lead._id.toString().slice(-6).toUpperCase() : '';
+  const refId = lead.referenceNumber || lead.invoiceNumber || (leadIdShort ? `AC-${leadIdShort}` : '—');
+  const pnrValue = lead.pnr || 'Pending Issue';
+  const formattedDate = visit.at.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  });
+
+  const cityDisplay = visit.city && visit.city !== 'Unknown City' ? visit.city : visit.location;
+  const browserDisplay = visit.browser || 'Unknown Browser';
+  const osDisplay = visit.os || 'Unknown OS';
+  const deviceDisplay = visit.device || 'Desktop';
+
   return `
-    <div style="font-family:Arial,Helvetica,sans-serif;color:#1a2b4c;">
-      <h2 style="color:#0B3C8A;margin:0 0 12px;">Customer viewed their booking portal</h2>
-      <p style="font-size:13px;color:#4a5b7f;margin:0 0 16px;">A customer just opened their itinerary/authorization portal. Please follow up.</p>
-      <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
-        <tr><td style="color:#5b7bab;">Lead</td><td style="font-weight:700;">${esc(lead.name)} (${esc(lead._id)})</td></tr>
-        <tr><td style="color:#5b7bab;">Passenger(s)</td><td>${esc(paxNames)}</td></tr>
-        <tr><td style="color:#5b7bab;">Contact</td><td>${esc(lead.phone)} · ${esc(lead.email)}</td></tr>
-        <tr><td style="color:#5b7bab;">Route</td><td>${esc(lead.origin)} → ${esc(lead.destination)}</td></tr>
-        <tr><td style="color:#5b7bab;">PNR / Ref</td><td>${esc(lead.pnr || lead.invoiceNumber || lead.referenceNumber)}</td></tr>
-        <tr><td style="color:#5b7bab;">Payment</td><td>${esc(lead.paymentStatus)} · ${esc(lead.currency || 'USD')} ${esc(lead.priceQuoted || 0)}</td></tr>
-        <tr><td style="color:#5b7bab;">Viewed at</td><td>${esc(visit.at.toISOString())}</td></tr>
-        <tr><td style="color:#5b7bab;">Visitor</td><td>${esc(visit.device)} · IP ${esc(visit.ip)} · ${esc(visit.location)}</td></tr>
-      </table>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Customer viewed booking portal</title>
+    </head>
+    <body style="margin:0;padding:24px 16px;background-color:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E293B;">
+      <div style="max-width:620px;margin:0 auto;background:#FFFFFF;border-radius:12px;overflow:hidden;border:1px solid #CBD5E1;box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+        
+        <!-- Header Banner -->
+        <div style="background:linear-gradient(135deg, #0B3C8A 0%, #1E40AF 100%);padding:22px 28px;border-bottom:3px solid #F59E0B;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr>
+              <td>
+                <div style="font-size:11px;font-weight:700;color:#FDE68A;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;">AirlinesConsolidator &bull; CS Alert</div>
+                <h1 style="color:#FFFFFF;font-size:20px;font-weight:800;margin:0;line-height:1.3;">Customer Viewed Booking Portal</h1>
+              </td>
+              <td style="text-align:right;vertical-align:middle;">
+                <span style="background:#FEF3C7;color:#92400E;font-size:12px;font-weight:800;padding:6px 12px;border-radius:20px;display:inline-block;white-space:nowrap;">
+                  👀 Portal Opened
+                </span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="padding:28px 28px 24px;">
+          <p style="font-size:14px;color:#475569;line-height:1.5;margin:0 0 20px;">
+            A customer has just accessed their online flight itinerary &amp; booking portal. Details and visitor telemetry are provided below for immediate follow-up.
+          </p>
+
+          <!-- Primary Reference Card -->
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;width:32%;">Ref # ID</td>
+                <td style="padding:6px 0;">
+                  <span style="font-family:monospace;font-size:15px;font-weight:800;color:#0B3C8A;background:#DBEAFE;padding:3px 10px;border-radius:6px;display:inline-block;border:1px solid #BFDBFE;">
+                    ${esc(refId)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">PNR / Booking Ref</td>
+                <td style="padding:6px 0;">
+                  <span style="font-family:monospace;font-size:14px;font-weight:700;color:#1E293B;background:#E2E8F0;padding:2px 8px;border-radius:4px;display:inline-block;">
+                    ${esc(pnrValue)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">Lead / Passenger</td>
+                <td style="padding:6px 0;font-weight:700;color:#0F172A;font-size:14px;">
+                  ${esc(lead.name)} <span style="font-size:11px;font-weight:normal;color:#64748B;font-family:monospace;">(${esc(lead._id)})</span>
+                </td>
+              </tr>
+              ${
+                paxNames && paxNames !== lead.name
+                  ? `<tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">Passenger(s)</td>
+                <td style="padding:6px 0;color:#1E293B;font-weight:600;">${esc(paxNames)}</td>
+              </tr>`
+                  : ''
+              }
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">Contact</td>
+                <td style="padding:6px 0;color:#1E293B;">
+                  <strong>${esc(lead.phone)}</strong> &bull; <a href="mailto:${esc(lead.email)}" style="color:#0284C7;text-decoration:none;">${esc(lead.email)}</a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">Route</td>
+                <td style="padding:6px 0;color:#0B3C8A;font-weight:800;font-size:14px;">
+                  ${esc(lead.origin || '—')} &rarr; ${esc(lead.destination || '—')} <span style="font-size:11px;font-weight:600;color:#64748B;background:#F1F5F9;padding:2px 6px;border-radius:4px;margin-left:6px;">${esc(lead.tripType || 'Flight')}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;color:#64748B;font-weight:600;">Payment &amp; Fare</td>
+                <td style="padding:6px 0;color:#1E293B;">
+                  <span style="font-weight:700;color:${lead.paymentStatus === 'Authorized' || lead.paymentStatus === 'Paid' ? '#16A34A' : '#D97706'};">
+                    ${esc(lead.paymentStatus || 'Pending')}
+                  </span>
+                  &bull; <strong>${esc(lead.currency || 'USD')} ${esc(Number(lead.priceQuoted || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }))}</strong>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Visitor Telemetry Box -->
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:16px 18px;margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+              🌐 Visitor &amp; Device Telemetry
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;width:32%;">IP Address</td>
+                <td style="padding:5px 0;">
+                  <span style="font-family:monospace;font-weight:700;color:#0F172A;background:#DCFCE7;padding:2px 8px;border-radius:4px;border:1px solid #86EFAC;">
+                    ${esc(visit.ip)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">City</td>
+                <td style="padding:5px 0;font-weight:700;color:#0F172A;">
+                  ${esc(cityDisplay)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">Location / Country</td>
+                <td style="padding:5px 0;color:#334155;">
+                  ${esc(visit.location)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">Browser</td>
+                <td style="padding:5px 0;font-weight:700;color:#0F172A;">
+                  ${esc(browserDisplay)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">OS &amp; Device</td>
+                <td style="padding:5px 0;color:#334155;">
+                  ${esc(deviceDisplay)} &bull; ${esc(osDisplay)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">Client Summary</td>
+                <td style="padding:5px 0;color:#64748B;font-size:12px;">
+                  ${esc(visit.summary)}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;color:#166534;font-weight:600;">Viewed At</td>
+                <td style="padding:5px 0;color:#0F172A;font-weight:600;">
+                  ${esc(formattedDate)}
+                  <div style="font-size:11px;color:#64748B;font-family:monospace;margin-top:2px;">${esc(visit.at.toISOString())}</div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="text-align:center;margin:28px 0 12px;">
+            ${
+              visit.crmUrl
+                ? `<a href="${visit.crmUrl}" style="display:inline-block;background:#0B3C8A;color:#FFFFFF !important;font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 3px 8px rgba(11,60,138,0.25);margin:0 6px 10px;">
+                    Open Lead in CRM &rarr;
+                   </a>`
+                : ''
+            }
+            ${
+              visit.portalUrl
+                ? `<a href="${visit.portalUrl}" style="display:inline-block;background:#F1F5F9;color:#0B3C8A !important;border:1px solid #CBD5E1;font-size:13px;font-weight:700;text-decoration:none;padding:11px 20px;border-radius:8px;margin:0 6px 10px;">
+                    View Customer Portal
+                   </a>`
+                : ''
+            }
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#F8FAFC;padding:16px 28px;border-top:1px solid #E2E8F0;text-align:center;font-size:11px;color:#64748B;">
+          This is an automated notification from the AirlinesConsolidator CRM portal tracking system.
+        </div>
+      </div>
+    </body>
+    </html>
   `;
 }
 
@@ -118,7 +313,8 @@ export async function GET(
 
     // 1. Capture visitor telemetry
     const ip = getClientIp(req);
-    const location = await resolveIpLocation(ip);
+    const locationDetails = await resolveIpDetails(ip);
+    const location = locationDetails.fullLocation;
     const userAgent = req.headers.get('user-agent') || 'Unknown';
     const parsedUa = parseUserAgent(userAgent);
     const now = new Date();
@@ -178,10 +374,38 @@ export async function GET(
       // Send once: skip if a successful notification was already logged.
       const alreadyNotified = (lead.activityLog || []).some((a: any) => a.type === 'cs_notified');
       if (!alreadyNotified) {
+        const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+        const proto = req.headers.get('x-forwarded-proto') || 'http';
+        const defaultLiveUrl =
+          process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')
+            ? process.env.NEXT_PUBLIC_APP_URL
+            : host
+            ? `${proto}://${host}`
+            : 'http://crm.airlinesconsolidator.com';
+        const baseUrl = defaultLiveUrl.replace(/\/+$/, '');
+        const crmUrl = `${baseUrl}/leads/${lead._id}`;
+        const portalUrl = `${baseUrl}/portal/${cleanToken}`;
+
+        const leadIdShort = lead._id ? lead._id.toString().slice(-6).toUpperCase() : '';
+        const refId = lead.referenceNumber || lead.invoiceNumber || (leadIdShort ? `AC-${leadIdShort}` : '—');
+
         const sent = await sendWithSingleRetry({
           to: CS_TEAM_EMAIL,
-          subject: `Portal viewed — ${lead.name || 'Lead'} (${lead.origin || '—'} → ${lead.destination || '—'})`,
-          html: buildCsNotificationHtml(lead, { ip, location, device: parsedUa.summary, at: now }),
+          subject: `Portal viewed — [Ref: ${refId}] ${lead.name || 'Lead'} (${lead.origin || '—'} → ${lead.destination || '—'})`,
+          html: buildCsNotificationHtml(lead, {
+            ip,
+            city: locationDetails.city,
+            region: locationDetails.region,
+            country: locationDetails.country,
+            location,
+            device: parsedUa.device,
+            browser: parsedUa.browser,
+            os: parsedUa.os,
+            summary: parsedUa.summary,
+            at: now,
+            crmUrl,
+            portalUrl,
+          }),
           leadId: lead._id.toString(),
         });
         if (sent) {
@@ -194,7 +418,7 @@ export async function GET(
                 description: `CS team notified of portal view (${CS_TEAM_EMAIL})`,
                 actorName: 'System',
                 timestamp: new Date(),
-                meta: { to: CS_TEAM_EMAIL, ip, location },
+                meta: { to: CS_TEAM_EMAIL, ip, location, refId },
               },
             },
           });

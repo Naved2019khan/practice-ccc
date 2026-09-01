@@ -102,7 +102,7 @@ export async function POST(
 
       const vars = buildTemplateVariables(
         lead,
-        user.name,
+        lead.agentName || user.name || 'Concierge Team',
         user.email,
         user.phone,
         undefined,
@@ -123,7 +123,7 @@ export async function POST(
         trackingToken,
         customMessage,
         baseUrl,
-        agentName: user.name,
+        agentName: lead.agentName || user.name || 'Concierge Team',
         agentEmail: user.email,
         attachedFiles: attachmentsToInclude,
       });
@@ -136,7 +136,7 @@ export async function POST(
       // Safeguard: replace any template variables or placeholder links in rawCustomHtml
       const vars = buildTemplateVariables(
         lead,
-        user.name,
+        lead.agentName || user.name || 'Concierge Team',
         user.email,
         user.phone,
         undefined,

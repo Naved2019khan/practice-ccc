@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Compass, Shield, UserCheck, ArrowRight, Plane, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -37,16 +37,6 @@ export default function LoginPage() {
       setError(err.message);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const setDemoCredentials = (role: 'admin' | 'staff') => {
-    if (role === 'admin') {
-      setEmail('admin@flightcrm.com');
-      setPassword('admin123');
-    } else {
-      setEmail('sarah.agent@flightcrm.com');
-      setPassword('staff123');
     }
   };
 
@@ -113,46 +103,6 @@ export default function LoginPage() {
             <p className="text-xs text-ember-text-secondary mt-1">
               Enter your credentials to access your CRM workspace.
             </p>
-          </div>
-
-          {/* Demo Login Quick Fills */}
-          <div className="bg-ember-surface border border-ember-border rounded-card p-4 space-y-2.5">
-            <p className="text-xs font-bold text-ember-text-primary uppercase tracking-wide">
-              ⚡ Quick Fill Demo Accounts
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('admin')}
-                className="flex items-center gap-2 p-2.5 rounded-btn bg-white border border-ember-border hover:border-ember-primary hover:bg-ember-primary/5 text-left transition-all group"
-              >
-                <div className="w-7 h-7 rounded bg-ember-primary/10 text-ember-primary flex items-center justify-center shrink-0">
-                  <Shield className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-ember-text-primary group-hover:text-ember-primary">
-                    Admin
-                  </div>
-                  <div className="text-[10px] text-ember-neutral">Full access</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('staff')}
-                className="flex items-center gap-2 p-2.5 rounded-btn bg-white border border-ember-border hover:border-ember-primary hover:bg-ember-primary/5 text-left transition-all group"
-              >
-                <div className="w-7 h-7 rounded bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-ember-text-primary group-hover:text-ember-primary">
-                    Staff Agent
-                  </div>
-                  <div className="text-[10px] text-ember-neutral">Assigned leads</div>
-                </div>
-              </button>
-            </div>
           </div>
 
           {error && (

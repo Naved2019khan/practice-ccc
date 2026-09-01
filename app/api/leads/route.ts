@@ -458,6 +458,7 @@ export async function POST(req: NextRequest) {
       stage,
       status: isLeadStatus(status) ? status : DEFAULT_LEAD_STATUS,
       assignedTo: finalAssignedTo,
+      agentName: body.agentName?.trim() || (finalAssignedTo ? (await User.findById(finalAssignedTo))?.name : (user?.name || 'Concierge Team')),
       paymentStatus,
       pnr: pnr?.trim(),
       pnrHtml: sanitizeHtml(pnrHtml),

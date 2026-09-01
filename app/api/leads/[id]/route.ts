@@ -82,6 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       stage,
       status,
       assignedTo: newAssignedToId,
+      agentName,
       paymentStatus,
       pnr,
       pnrHtml,
@@ -254,6 +255,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (ticketNumber !== undefined) lead.ticketNumber = ticketNumber?.trim() || '';
     if (invoiceNumber !== undefined) lead.invoiceNumber = invoiceNumber?.trim() || '';
+    if (agentName !== undefined) {
+      lead.agentName = agentName?.trim() || '';
+    } else if (!lead.agentName && lead.assignedTo) {
+      const staffUser = await User.findById(lead.assignedTo);
+      if (staffUser) lead.agentName = staffUser.name;
+    }
     if (priceQuoted !== undefined) lead.priceQuoted = isNaN(Number(priceQuoted)) ? 0 : Number(priceQuoted);
     if (currency !== undefined) lead.currency = currency;
     if (nextFollowUpDate !== undefined) lead.nextFollowUpDate = parseDateSafe(nextFollowUpDate);

@@ -160,6 +160,7 @@ export default function LeadDetailPage() {
         pnrHtml: data.lead.pnrHtml || '',
         ticketNumber: data.lead.ticketNumber || '',
         invoiceNumber: data.lead.invoiceNumber || '',
+        agentName: data.lead.agentName || (data.lead.assignedTo && typeof data.lead.assignedTo === 'object' ? data.lead.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
         priceQuoted: data.lead.priceQuoted || '',
         currency: data.lead.currency || 'USD',
         nextFollowUpDate: data.lead.nextFollowUpDate
@@ -177,9 +178,13 @@ export default function LeadDetailPage() {
       const tmplRes = await fetch('/api/templates');
       if (tmplRes.ok) {
         const tmplData = await tmplRes.json();
-        setTemplates(tmplData.templates || []);
-        if (tmplData.templates?.length > 0 && !selectedTemplateId) {
-          applyTemplate(tmplData.templates[0], data.lead);
+        const list = tmplData.templates || [];
+        setTemplates(list);
+        if (list.length > 0) {
+          const currentTmpl = list.find((t: any) => t._id === selectedTemplateId) || list[0];
+          if (currentTmpl) {
+            applyTemplate(currentTmpl, data.lead);
+          }
         }
       }
 
@@ -291,6 +296,13 @@ export default function LeadDetailPage() {
       setShowSaveConfirm(false);
       setIsEditingSpecs(false);
       toast.success('Flight Details Updated', 'All passenger and itinerary details saved successfully.');
+      if (data.lead) {
+        setLead(data.lead);
+        const currentTmpl = templates.find((t: any) => t._id === selectedTemplateId) || templates[0];
+        if (currentTmpl) {
+          applyTemplate(currentTmpl, data.lead);
+        }
+      }
       await fetchLeadDetails();
     } catch (e: any) {
       console.error(e);
@@ -382,7 +394,7 @@ export default function LeadDetailPage() {
       : (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost') ? process.env.NEXT_PUBLIC_APP_URL : 'http://crm.airlinesconsolidator.com');
     const vars = buildTemplateVariables(
       l,
-      currentUser?.name || (l.assignedTo ? l.assignedTo.name : 'Concierge Team'),
+      l.agentName || (l.assignedTo && typeof l.assignedTo === 'object' ? l.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
       currentUser?.email || (l.assignedTo ? l.assignedTo.email : ''),
       currentUser?.phone || (l.assignedTo ? l.assignedTo.phone : ''),
       undefined,
@@ -695,6 +707,7 @@ export default function LeadDetailPage() {
                   pnrHtml: lead.pnrHtml || '',
                   ticketNumber: lead.ticketNumber || '',
                   invoiceNumber: lead.invoiceNumber || '',
+                  agentName: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
                   nextFollowUpDate: lead.nextFollowUpDate ? lead.nextFollowUpDate.split('T')[0] : '',
                   passengers: lead.passengers || [],
                   billing: lead.billing || {},
@@ -2018,14 +2031,14 @@ export default function LeadDetailPage() {
                           {/<\/?[a-z][\s\S]*>/i.test(lead.pnrHtml) ? (
                             <>
                               <style>{`
-                                .pnr-html-preview table { border-collapse: collapse; width: 100%; font-size: 12px; }
-                                .pnr-html-preview th, .pnr-html-preview td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
-                                .pnr-html-preview thead th, .pnr-html-preview th { background: #f5f5f4; font-weight: 700; }
-                                .pnr-html-preview img { max-width: 100%; height: auto; }
-                                .pnr-html-preview a { color: #b45309; text-decoration: underline; }
+                                .pnr-html-preview table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 4px 0; border: 1px solid #e2e8f0; }
+                                .pnr-html-preview th { background: #f1f5f9; color: #0b3c8a; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8; padding: 8px 10px; text-align: left; vertical-align: middle; white-space: nowrap; }
+                                .pnr-html-preview td { border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; color: #1e293b; text-align: left; vertical-align: middle; }
+                                .pnr-html-preview img { max-height: 28px; max-width: 90px; width: auto; height: auto; vertical-align: middle; display: inline-block; }
+                                .pnr-html-preview a { color: #0b3c8a; text-decoration: underline; }
                               `}</style>
                               <div
-                                className="pnr-html-preview text-xs text-ember-text-primary"
+                                className="pnr-html-preview text-xs text-ember-text-primary overflow-x-auto"
                                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(lead.pnrHtml) }}
                               />
                             </>

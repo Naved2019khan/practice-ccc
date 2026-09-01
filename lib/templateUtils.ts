@@ -152,6 +152,8 @@ const DEFAULT_FALLBACKS: Record<string, string> = {
   card_last4: '****',
   billing_address: 'On file / Verified',
   agent_name: 'Concierge Team',
+  concierge_name: 'Concierge Team',
+  agent_concierge: 'Concierge Team',
   agent_email: 'concierge@airlinesconsolidator.com',
   agent_phone: '+1 (888) 883-0727',
   company_name: 'AirlinesConsolidator',
@@ -314,28 +316,95 @@ export function buildItineraryHtml(lead: any): string {
 }
 
 /**
+ * Inlines email-safe styles onto pasted PNR converter HTML so that Gmail, Outlook,
+ * Apple Mail, and mobile clients render crisp gridlines, readable column headers,
+ * proper spacing, and correctly sized airline logos without distortion.
+ */
+export function enhancePnrHtmlForEmail(rawHtml: string): string {
+  if (!rawHtml || !rawHtml.trim()) return '';
+  let html = sanitizeHtml(rawHtml);
+
+  // If there are no HTML tags, return formatted pre
+  if (!/<\/?[a-z][\s\S]*>/i.test(html)) {
+    return `<div style="font-family:monospace; font-size:12px; color:#1E293B; background:#F8FAFC; padding:12px; border-radius:6px; border:1px solid #E2E8F0; white-space:pre-wrap;">${html}</div>`;
+  }
+
+  // 1. Format table tags: ensure 100% width, border-collapse, and clean spacing
+  html = html.replace(/<table\b([^>]*)>/gi, (_match, attrs) => {
+    const tableStyle = 'width:100%; border-collapse:collapse; border-spacing:0; font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif; font-size:12px; line-height:1.4; margin:0 0 8px 0; background-color:#ffffff;';
+    if (/style\s*=\s*"([^"]*)"/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m: string, s: string) => `style="${tableStyle} ${s}"`);
+    } else if (/style\s*=\s*'([^']*)'/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*'([^']*)'/i, (_m: string, s: string) => `style='${tableStyle} ${s}'`);
+    } else {
+      attrs = `${attrs} style="${tableStyle}"`;
+    }
+    return `<table ${attrs.trim()}>`;
+  });
+
+  // 2. Format <th> tags (headers: Date, Airline, Flight No, Depart, From, Arrive, At, Duration, Transit, Aircraft)
+  html = html.replace(/<th\b([^>]*)>/gi, (_match, attrs) => {
+    const thStyle = 'background-color:#F3F7FF; color:#0B3C8A; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; padding:10px 8px; border:1px solid #CBD5E1; border-bottom:2px solid #94A3B8; text-align:left; vertical-align:middle; white-space:nowrap; line-height:1.3;';
+    if (/style\s*=\s*"([^"]*)"/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m: string, s: string) => `style="${thStyle} ${s}"`);
+    } else if (/style\s*=\s*'([^']*)'/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*'([^']*)'/i, (_m: string, s: string) => `style='${thStyle} ${s}'`);
+    } else {
+      attrs = `${attrs} style="${thStyle}"`;
+    }
+    return `<th ${attrs.trim()}>`;
+  });
+
+  // 3. Format <td> tags (cells: dates, route, airline logo, flight number, times, duration)
+  html = html.replace(/<td\b([^>]*)>/gi, (_match, attrs) => {
+    const tdStyle = 'padding:10px 8px; font-size:12px; color:#1E293B; border:1px solid #E2ECFB; vertical-align:middle; line-height:1.4;';
+    if (/style\s*=\s*"([^"]*)"/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m: string, s: string) => `style="${tdStyle} ${s}"`);
+    } else if (/style\s*=\s*'([^']*)'/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*'([^']*)'/i, (_m: string, s: string) => `style='${tdStyle} ${s}'`);
+    } else {
+      attrs = `${attrs} style="${tdStyle}"`;
+    }
+    return `<td ${attrs.trim()}>`;
+  });
+
+  // 4. Format <img> tags (airline logos/icons)
+  html = html.replace(/<img\b([^>]*)>/gi, (_match, attrs) => {
+    const imgStyle = 'display:inline-block; max-height:28px; max-width:90px; height:auto; width:auto; vertical-align:middle; border:0; outline:none;';
+    if (/style\s*=\s*"([^"]*)"/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, (_m: string, s: string) => `style="${imgStyle} ${s}"`);
+    } else if (/style\s*=\s*'([^']*)'/i.test(attrs)) {
+      attrs = attrs.replace(/style\s*=\s*'([^']*)'/i, (_m: string, s: string) => `style='${imgStyle} ${s}'`);
+    } else {
+      attrs = `${attrs} style="${imgStyle}"`;
+    }
+    return `<img ${attrs.trim()} />`;
+  });
+
+  return html;
+}
+
+/**
  * Returns the real flight itinerary HTML for the email.
  *
  * Preferred source is the itinerary the agent pasted on the lead
- * (`lead.pnrHtml`, from pnrconverter.com). We sanitize it and wrap it so it
- * renders cleanly inside the branded email. When a lead has no pasted PNR HTML
- * (older records), we fall back to the legacy synthetic table so the email
- * still shows something.
+ * (`lead.pnrHtml`, from pnrconverter.com). We sanitize it, inline email-safe table styles,
+ * and wrap it in a scroll-friendly container so it renders cleanly and un-distorted in Gmail.
  */
 export function buildPnrItineraryHtml(lead: any): string {
   const raw = lead?.pnrHtml;
   if (raw && String(raw).trim()) {
-    const safe = sanitizeHtml(String(raw));
-    // Wrapper keeps the itinerary contained and readable in email clients while
-    // leaving the pasted markup (tables/logos/inline styles) intact.
+    const enhanced = enhancePnrHtmlForEmail(String(raw));
     return `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; border:1px solid #E2ECFB; border-radius:8px; margin-bottom:24px; background:#ffffff; overflow:hidden;">
-        <tr>
-          <td style="padding:14px 16px;">
-            ${safe}
-          </td>
-        </tr>
-      </table>
+      <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin:8px 0 20px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; border:1px solid #CBD5E1; border-radius:8px; background:#ffffff; overflow:hidden;">
+          <tr>
+            <td style="padding:10px 12px; background-color:#ffffff;">
+              ${enhanced}
+            </td>
+          </tr>
+        </table>
+      </div>
     `;
   }
   // Legacy fallback for leads created before PNR HTML capture.
@@ -518,7 +587,10 @@ export function buildTemplateVariables(
   // Resolved Agent details
   const assignedAgent = lead.assignedTo;
   const resolvedAgentName =
-    agentName || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.name : '') || 'Concierge Team';
+    lead.agentName ||
+    agentName ||
+    (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.name : '') ||
+    'Concierge Team';
   const resolvedAgentEmail =
     agentEmail || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.email : '') || 'concierge@airlinesconsolidator.com';
   const resolvedAgentPhone =
@@ -592,6 +664,8 @@ export function buildTemplateVariables(
 
     // Agent / Company
     agent_name: resolvedAgentName,
+    concierge_name: resolvedAgentName,
+    agent_concierge: resolvedAgentName,
     agent_email: resolvedAgentEmail,
     agent_phone: resolvedAgentPhone,
     company_name: companyName || 'AirlinesConsolidator',

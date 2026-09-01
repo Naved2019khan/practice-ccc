@@ -64,13 +64,14 @@ export function sanitizeHtml(input: string | null | undefined): string {
   html = html.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '');
   html = html.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '');
 
-  // Neutralize javascript:/vbscript:/data: URLs in href/src/style.
+  // Neutralize javascript:/vbscript: and non-image data: URLs in href/src/style.
+  // We allow data:image/ (e.g. data:image/png;base64,...) so airline logos/icons pasted from PNR converters are preserved.
   html = html.replace(
-    /(href|src|xlink:href)\s*=\s*"(?:\s*)(?:javascript|vbscript|data):[^"]*"/gi,
+    /(href|src|xlink:href)\s*=\s*"(?:\s*)(?:javascript|vbscript|data(?!\s*:\s*image\/)):[^"]*"/gi,
     '$1="#"'
   );
   html = html.replace(
-    /(href|src|xlink:href)\s*=\s*'(?:\s*)(?:javascript|vbscript|data):[^']*'/gi,
+    /(href|src|xlink:href)\s*=\s*'(?:\s*)(?:javascript|vbscript|data(?!\s*:\s*image\/)):[^']*'/gi,
     "$1='#'"
   );
 

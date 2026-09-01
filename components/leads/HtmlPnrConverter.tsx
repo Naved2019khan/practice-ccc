@@ -172,8 +172,15 @@ export const HtmlPnrConverter: React.FC<HtmlPnrConverterProps> = ({
         <div className="space-y-1.5">
           <div className="text-[10px] font-bold uppercase tracking-wider text-ember-neutral">Preview</div>
           <div className="rounded-btn border border-ember-border bg-white p-3 max-h-[420px] overflow-auto shadow-inner">
+            <style>{`
+              .pnr-html-preview table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 4px 0; border: 1px solid #e2e8f0; }
+              .pnr-html-preview th { background: #f1f5f9; color: #0b3c8a; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8; padding: 8px 10px; text-align: left; vertical-align: middle; white-space: nowrap; }
+              .pnr-html-preview td { border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; color: #1e293b; text-align: left; vertical-align: middle; }
+              .pnr-html-preview img { max-height: 28px; max-width: 90px; width: auto; height: auto; vertical-align: middle; display: inline-block; }
+              .pnr-html-preview a { color: #0b3c8a; text-decoration: underline; }
+            `}</style>
             <div
-              className="pnr-html-preview text-xs text-ember-text-primary"
+              className="pnr-html-preview text-xs text-ember-text-primary overflow-x-auto"
               dangerouslySetInnerHTML={{ __html: safeHtml }}
             />
           </div>

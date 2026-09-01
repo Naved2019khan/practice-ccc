@@ -96,7 +96,7 @@ export const LeadEmailComposerModal: React.FC<LeadEmailComposerModalProps> = ({
       : (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost') ? process.env.NEXT_PUBLIC_APP_URL : 'http://crm.airlinesconsolidator.com');
     return buildTemplateVariables(
       lead,
-      lead.assignedTo?.name || '',
+      lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || 'Concierge Team',
       lead.assignedTo?.email || '',
       lead.assignedTo?.phone || '',
       undefined,

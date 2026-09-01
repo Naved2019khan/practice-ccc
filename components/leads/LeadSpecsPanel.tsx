@@ -36,14 +36,14 @@ function PnrPreview({ html }: { html?: string }) {
       {looksLikeHtml ? (
         <>
           <style>{`
-            .pnr-html-preview table { border-collapse: collapse; max-width: 100%; font-size: 12px; }
-            .pnr-html-preview th, .pnr-html-preview td { border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: top; }
-            .pnr-html-preview thead th, .pnr-html-preview th { background: #f5f5f4; font-weight: 700; }
-            .pnr-html-preview img { max-width: 100%; height: auto; }
-            .pnr-html-preview a { color: #b45309; text-decoration: underline; }
+            .pnr-html-preview table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 4px 0; border: 1px solid #e2e8f0; }
+            .pnr-html-preview th { background: #f1f5f9; color: #0b3c8a; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8; padding: 8px 10px; text-align: left; vertical-align: middle; white-space: nowrap; }
+            .pnr-html-preview td { border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; color: #1e293b; text-align: left; vertical-align: middle; }
+            .pnr-html-preview img { max-height: 28px; max-width: 90px; width: auto; height: auto; vertical-align: middle; display: inline-block; }
+            .pnr-html-preview a { color: #0b3c8a; text-decoration: underline; }
           `}</style>
           <div
-            className="pnr-html-preview text-xs text-ember-text-primary"
+            className="pnr-html-preview text-xs text-ember-text-primary overflow-x-auto"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
           />
         </>
@@ -137,6 +137,12 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-2">
+            <Input
+              label="Agent / Concierge"
+              placeholder="e.g. Admin / Concierge Team"
+              value={editForm.agentName ?? ''}
+              onChange={(e) => set({ agentName: e.target.value })}
+            />
             <Input label="Next Follow-Up" type="date" value={editForm.nextFollowUpDate || ''} onChange={(e) => set({ nextFollowUpDate: e.target.value })} />
           </div>
 
@@ -292,6 +298,7 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
             { label: 'PNR', value: lead.pnr || '—', mono: true, highlight: !!lead.pnr },
             { label: 'Ticket #', value: lead.ticketNumber || '—', mono: true },
             { label: 'Invoice #', value: lead.invoiceNumber || '—', mono: true },
+            { label: 'Agent / Concierge', value: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || 'Concierge Team' },
             { label: 'Payment', value: lead.paymentStatus },
             { label: 'Next Follow-Up', value: followUp },
           ].map(({ label, value, mono, highlight }: any) => (

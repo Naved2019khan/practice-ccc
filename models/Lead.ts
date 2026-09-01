@@ -187,6 +187,8 @@ export interface ILead extends Document {
   /** Operational state of the request, orthogonal to the sales `stage`. */
   status: LeadStatus;
   assignedTo?: mongoose.Types.ObjectId | null;
+  /** Agent or Concierge name override */
+  agentName?: string;
   paymentStatus: 'Pending' | 'Authorized' | 'Partial' | 'Paid' | 'Failed' | 'Refunded';
   pnr?: string;
   /** HTML itinerary pasted from an external PNR converter (e.g. pnrconverter.com). */
@@ -467,6 +469,7 @@ const LeadSchema = new Schema<ILead>(
       index: true,
     },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    agentName: { type: String, trim: true },
     paymentStatus: {
       type: String,
       enum: ['Pending', 'Authorized', 'Partial', 'Paid', 'Failed', 'Refunded'],

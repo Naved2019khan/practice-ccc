@@ -87,12 +87,26 @@ export function getClientIp(req: NextRequest): string {
   return '127.0.0.1 (Localhost)';
 }
 
+export interface IpLocationDetails {
+  city: string;
+  region: string;
+  country: string;
+  fullLocation: string;
+}
+
 /**
- * Resolves an IP address to a human-readable location (City, Region, Country).
+ * Resolves an IP address to structured location data (city, region, country, fullLocation).
  * Uses ip-api.com (free, reliable server-side geo resolution).
  */
-export async function resolveIpLocation(ip: string): Promise<string> {
-  if (!ip) return 'Location unavailable';
+export async function resolveIpDetails(ip: string): Promise<IpLocationDetails> {
+  if (!ip) {
+    return {
+      city: 'Unknown City',
+      region: 'Unknown Region',
+      country: 'Unknown Country',
+      fullLocation: 'Location unavailable',
+    };
+  }
   const cleanIp = ip.replace(/^::ffff:/, '').replace(/\s*\(Localhost\)$/i, '').trim();
 
   // Check for private / loopback IP ranges
@@ -105,7 +119,12 @@ export async function resolveIpLocation(ip: string): Promise<string> {
     cleanIp.startsWith('172.16.') ||
     cleanIp.toLowerCase().includes('localhost')
   ) {
-    return 'Localhost / Internal Network';
+    return {
+      city: 'Localhost',
+      region: 'Internal Network',
+      country: 'Localhost',
+      fullLocation: 'Localhost / Internal Network',
+    };
   }
 
   try {
@@ -115,15 +134,37 @@ export async function resolveIpLocation(ip: string): Promise<string> {
     if (geoRes.ok) {
       const geo = await geoRes.json();
       if (geo.status === 'success') {
-        const parts = [geo.city, geo.regionName, geo.country].filter(Boolean);
-        return parts.length > 0 ? parts.join(', ') : 'Unknown Location';
+        const city = geo.city || '';
+        const region = geo.regionName || '';
+        const country = geo.country || '';
+        const parts = [city, region, country].filter(Boolean);
+        return {
+          city: city || 'Unknown City',
+          region: region || '',
+          country: country || '',
+          fullLocation: parts.length > 0 ? parts.join(', ') : 'Unknown Location',
+        };
       }
     }
   } catch (err) {
     // Geo lookup is non-blocking fallback
   }
 
-  return 'Location unavailable';
+  return {
+    city: 'Unknown City',
+    region: 'Unknown Region',
+    country: 'Unknown Country',
+    fullLocation: 'Location unavailable',
+  };
+}
+
+/**
+ * Resolves an IP address to a human-readable location (City, Region, Country).
+ * Uses ip-api.com (free, reliable server-side geo resolution).
+ */
+export async function resolveIpLocation(ip: string): Promise<string> {
+  const details = await resolveIpDetails(ip);
+  return details.fullLocation;
 }
 
 export interface CustomerEmailParams {
