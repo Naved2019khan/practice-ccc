@@ -50,7 +50,13 @@ export async function POST(req: NextRequest) {
           if (row.email) existingLead.email = row.email.toString().trim();
           if (row.origin) existingLead.origin = origin;
           if (row.destination) existingLead.destination = destination;
-          if (row.priceQuoted) existingLead.priceQuoted = Number(row.priceQuoted) || existingLead.priceQuoted;
+          if (row.airlineCharge) existingLead.airlineCharge = Number(row.airlineCharge) || existingLead.airlineCharge;
+          if (row.airlineConsolidatorCharge) existingLead.airlineConsolidatorCharge = Number(row.airlineConsolidatorCharge) || existingLead.airlineConsolidatorCharge;
+          if (row.totalAmount) {
+            existingLead.totalAmount = Number(row.totalAmount) || existingLead.totalAmount;
+          } else if (row.airlineCharge || row.airlineConsolidatorCharge) {
+            existingLead.totalAmount = Number(existingLead.airlineCharge || 0) + Number(existingLead.airlineConsolidatorCharge || 0);
+          }
           if (row.stage) existingLead.stage = row.stage;
           if (row.paymentStatus) existingLead.paymentStatus = row.paymentStatus;
           if (row.pnr) existingLead.pnr = row.pnr.toString().trim();
@@ -104,7 +110,9 @@ export async function POST(req: NextRequest) {
         paymentStatus: row.paymentStatus || 'Pending',
         pnr: row.pnr?.toString().trim(),
         invoiceNumber: row.invoiceNumber?.toString().trim(),
-        priceQuoted: Number(row.priceQuoted) || 0,
+        airlineCharge: Number(row.airlineCharge) || 0,
+        airlineConsolidatorCharge: Number(row.airlineConsolidatorCharge) || 0,
+        totalAmount: Number(row.totalAmount) || (Number(row.airlineCharge) || 0) + (Number(row.airlineConsolidatorCharge) || 0),
         currency: row.currency || 'USD',
         nextFollowUpDate: isNaN(nextFollowUpDate?.getTime() || NaN) ? undefined : nextFollowUpDate,
         notes: row.notes

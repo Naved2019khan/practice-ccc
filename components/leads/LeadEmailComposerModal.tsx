@@ -230,9 +230,13 @@ export const LeadEmailComposerModal: React.FC<LeadEmailComposerModalProps> = ({
       })
     : 'Pending';
 
+  const displayedAmount =
+    lead.totalAmount && lead.totalAmount > 0
+      ? lead.totalAmount
+      : (Number(lead.airlineCharge || 0) + Number(lead.airlineConsolidatorCharge || 0));
   const priceFormatted =
-    lead.priceQuoted && lead.priceQuoted > 0
-      ? `${lead.currency || 'USD'} ${Number(lead.priceQuoted).toLocaleString('en-US', {
+    displayedAmount && displayedAmount > 0
+      ? `${lead.currency || 'USD'} ${Number(displayedAmount).toLocaleString('en-US', {
           minimumFractionDigits: 2,
         })}`
       : 'Quotation in Review';

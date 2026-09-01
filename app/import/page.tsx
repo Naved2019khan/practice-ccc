@@ -35,7 +35,9 @@ export default function ImportPage() {
     { key: 'travelDate', label: 'Travel Date' },
     { key: 'returnDate', label: 'Return Date' },
     { key: 'pax', label: 'Pax (Passengers)' },
-    { key: 'priceQuoted', label: 'Quoted Price ($)' },
+    { key: 'airlineCharge', label: 'Airline Charge ($)' },
+    { key: 'airlineConsolidatorCharge', label: 'Airline Consolidator Charge ($)' },
+    { key: 'totalAmount', label: 'Total Amount ($)' },
     { key: 'source', label: 'Lead Source' },
     { key: 'stage', label: 'Initial Stage' },
     { key: 'pnr', label: 'PNR / Reference' },
@@ -103,7 +105,9 @@ export default function ImportPage() {
       else if (lower.includes('traveldate') || lower.includes('date') || lower.includes('depart')) mapping.travelDate = h;
       else if (lower.includes('returndate') || lower.includes('return')) mapping.returnDate = h;
       else if (lower.includes('pax') || lower.includes('passenger') || lower.includes('count')) mapping.pax = h;
-      else if (lower.includes('price') || lower.includes('fare') || lower.includes('quote') || lower.includes('cost')) mapping.priceQuoted = h;
+      else if (lower.includes('consolidator')) mapping.airlineConsolidatorCharge = h;
+      else if (lower.includes('airline') && (lower.includes('charge') || lower.includes('price') || lower.includes('fare'))) mapping.airlineCharge = h;
+      else if (lower.includes('total') || lower.includes('price') || lower.includes('fare') || lower.includes('quote') || lower.includes('cost') || lower.includes('amount')) mapping.totalAmount = h;
       else if (lower.includes('source') || lower.includes('channel')) mapping.source = h;
       else if (lower.includes('stage') || lower.includes('status')) mapping.stage = h;
       else if (lower.includes('pnr') || lower.includes('reference')) mapping.pnr = h;

@@ -97,7 +97,11 @@ const PLACEHOLDER_GROUPS: PlaceholderGroup[] = [
     category: 'Pricing & Payment Authorization',
     icon: CreditCard,
     items: [
-      { tag: '{{price}}', desc: 'Total Booking Amount / Quoted Fare' },
+      { tag: '{{total_amount}}', desc: 'Total Booking Amount' },
+      { tag: '{{airline_charge}}', desc: 'Airline Charge' },
+      { tag: '{{airline_consolidator_charge}}', desc: 'Airline Consolidator Charge' },
+      { tag: '{{pricing_block_html}}', desc: 'Pricing table (total only or full breakdown, per lead setting)' },
+      { tag: '{{price}}', desc: 'Total Booking Amount (alias of total_amount)' },
       { tag: '{{currency}}', desc: 'Currency Code (e.g. USD)' },
       { tag: '{{card_brand}}', desc: 'Credit Card Brand (Visa, MC, etc.)' },
       { tag: '{{card_holder_name}}', desc: 'Cardholder Full Name' },

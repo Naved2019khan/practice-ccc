@@ -47,7 +47,10 @@ export interface LeadFormValues {
   bookingType?: string;
   stage?: string;
   status?: string;
-  priceQuoted?: number | string;
+  airlineCharge?: number | string;
+  airlineConsolidatorCharge?: number | string;
+  totalAmount?: number | string;
+  pricingDisplayMode?: 'total' | 'breakdown';
   nextFollowUpDate?: string;
   assignedTo?: string;
   initialNote?: string;
@@ -242,7 +245,9 @@ export const LEAD_FIELD_ORDER: string[] = [
   'travelDate',
   'returnDate',
   'pax',
-  'priceQuoted',
+  'airlineCharge',
+  'airlineConsolidatorCharge',
+  'totalAmount',
   'nextFollowUpDate',
   'billing.email',
   'billing.phone',
@@ -343,9 +348,17 @@ export function validateLeadForm(values: LeadFormValues): ValidationErrors {
     if (isBlank(p.gender)) errors[key('gender')] = 'Select a gender';
   }
 
-  const price = Number(values.priceQuoted);
-  if (!isBlank(values.priceQuoted) && (Number.isNaN(price) || price < 0))
-    errors.priceQuoted = 'Enter a price of 0 or more';
+  const airlineCharge = Number(values.airlineCharge);
+  if (!isBlank(values.airlineCharge) && (Number.isNaN(airlineCharge) || airlineCharge < 0))
+    errors.airlineCharge = 'Enter an amount of 0 or more';
+
+  const consolidatorCharge = Number(values.airlineConsolidatorCharge);
+  if (!isBlank(values.airlineConsolidatorCharge) && (Number.isNaN(consolidatorCharge) || consolidatorCharge < 0))
+    errors.airlineConsolidatorCharge = 'Enter an amount of 0 or more';
+
+  const totalAmount = Number(values.totalAmount);
+  if (!isBlank(values.totalAmount) && (Number.isNaN(totalAmount) || totalAmount < 0))
+    errors.totalAmount = 'Enter an amount of 0 or more';
 
   if (!isBlank(values.nextFollowUpDate) && !parseDateInput(String(values.nextFollowUpDate)))
     errors.nextFollowUpDate = 'Enter a valid date';

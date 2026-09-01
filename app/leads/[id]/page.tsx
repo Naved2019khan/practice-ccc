@@ -160,8 +160,11 @@ export default function LeadDetailPage() {
         pnrHtml: data.lead.pnrHtml || '',
         ticketNumber: data.lead.ticketNumber || '',
         invoiceNumber: data.lead.invoiceNumber || '',
-        agentName: data.lead.agentName || (data.lead.assignedTo && typeof data.lead.assignedTo === 'object' ? data.lead.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
-        priceQuoted: data.lead.priceQuoted || '',
+        agentName: data.lead.agentName || (data.lead.assignedTo && typeof data.lead.assignedTo === 'object' ? data.lead.assignedTo.name : '') || 'Airlineconsolidator team',
+        airlineCharge: data.lead.airlineCharge || '',
+        airlineConsolidatorCharge: data.lead.airlineConsolidatorCharge || '',
+        totalAmount: data.lead.totalAmount || '',
+        pricingDisplayMode: data.lead.pricingDisplayMode || 'total',
         currency: data.lead.currency || 'USD',
         nextFollowUpDate: data.lead.nextFollowUpDate
           ? data.lead.nextFollowUpDate.split('T')[0]
@@ -394,7 +397,7 @@ export default function LeadDetailPage() {
       : (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost') ? process.env.NEXT_PUBLIC_APP_URL : 'http://crm.airlinesconsolidator.com');
     const vars = buildTemplateVariables(
       l,
-      l.agentName || (l.assignedTo && typeof l.assignedTo === 'object' ? l.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
+      l.agentName || (l.assignedTo && typeof l.assignedTo === 'object' ? l.assignedTo.name : '') || 'Airlineconsolidator team',
       currentUser?.email || (l.assignedTo ? l.assignedTo.email : ''),
       currentUser?.phone || (l.assignedTo ? l.assignedTo.phone : ''),
       undefined,
@@ -701,13 +704,16 @@ export default function LeadDetailPage() {
                   status: lead.status || 'Open',
                   stage: lead.stage || 'New',
                   paymentStatus: lead.paymentStatus || 'Pending',
-                  priceQuoted: lead.priceQuoted || '',
+                  airlineCharge: lead.airlineCharge || '',
+                  airlineConsolidatorCharge: lead.airlineConsolidatorCharge || '',
+                  totalAmount: lead.totalAmount || '',
+                  pricingDisplayMode: lead.pricingDisplayMode || 'total',
                   currency: lead.currency || 'USD',
                   pnr: lead.pnr || '',
                   pnrHtml: lead.pnrHtml || '',
                   ticketNumber: lead.ticketNumber || '',
                   invoiceNumber: lead.invoiceNumber || '',
-                  agentName: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || currentUser?.name || 'Concierge Team',
+                  agentName: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || 'Airlineconsolidator team',
                   nextFollowUpDate: lead.nextFollowUpDate ? lead.nextFollowUpDate.split('T')[0] : '',
                   passengers: lead.passengers || [],
                   billing: lead.billing || {},
@@ -904,11 +910,38 @@ export default function LeadDetailPage() {
                         </div>
                       </div>
                       <Input
-                        label="Price Quoted"
+                        label="Airline Charge"
                         type="number"
+                        min={0}
+                        step="0.01"
                         placeholder="0.00"
-                        value={editForm.priceQuoted}
-                        onChange={(e) => setEditForm({ ...editForm, priceQuoted: e.target.value })}
+                        value={editForm.airlineCharge ?? ''}
+                        onChange={(e) => {
+                          const sum = (Number(e.target.value) || 0) + (Number(editForm.airlineConsolidatorCharge) || 0);
+                          setEditForm({ ...editForm, airlineCharge: e.target.value, totalAmount: sum ? String(sum) : '' });
+                        }}
+                      />
+                      <Input
+                        label="Airline Consolidator Charge"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={editForm.airlineConsolidatorCharge ?? ''}
+                        onChange={(e) => {
+                          const sum = (Number(editForm.airlineCharge) || 0) + (Number(e.target.value) || 0);
+                          setEditForm({ ...editForm, airlineConsolidatorCharge: e.target.value, totalAmount: sum ? String(sum) : '' });
+                        }}
+                      />
+                      <Input
+                        label="Total Amount"
+                        labelHint="Auto = sum · editable"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={editForm.totalAmount ?? ''}
+                        onChange={(e) => setEditForm({ ...editForm, totalAmount: e.target.value })}
                       />
                       <Select
                         label="Currency"
@@ -923,6 +956,14 @@ export default function LeadDetailPage() {
                         <option value="PKR">PKR (Rs)</option>
                         <option value="INR">INR (₹)</option>
                         <option value="SAR">SAR (﷼)</option>
+                      </Select>
+                      <Select
+                        label="Template Pricing Display"
+                        value={editForm.pricingDisplayMode || 'total'}
+                        onChange={(e) => setEditForm({ ...editForm, pricingDisplayMode: e.target.value })}
+                      >
+                        <option value="total">Show Total Amount only</option>
+                        <option value="breakdown">Show all three (breakdown)</option>
                       </Select>
                     </div>
 
@@ -1699,7 +1740,10 @@ export default function LeadDetailPage() {
                           returnDate: lead.returnDate ? lead.returnDate.split('T')[0] : '',
                           pax: lead.pax || 1,
                           tripType: lead.tripType || 'Round Trip',
-                          priceQuoted: lead.priceQuoted || 0,
+                          airlineCharge: lead.airlineCharge || '',
+                          airlineConsolidatorCharge: lead.airlineConsolidatorCharge || '',
+                          totalAmount: lead.totalAmount || '',
+                          pricingDisplayMode: lead.pricingDisplayMode || 'total',
                           bookingType: lead.bookingType || 'New Booking',
                           status: lead.status || 'Open',
                           stage: lead.stage || 'New',
@@ -1783,7 +1827,13 @@ export default function LeadDetailPage() {
                   {/* ── Booking Summary ── */}
                   <div className="space-y-0 text-xs divide-y divide-ember-border/60">
                     {[
-                      { label: 'Quoted Fare', value: lead.priceQuoted > 0 ? `${lead.currency || 'USD'} ${lead.priceQuoted.toLocaleString()}` : 'Not Quoted', bold: true, highlight: lead.priceQuoted > 0 },
+                      ...(lead.pricingDisplayMode === 'breakdown'
+                        ? [
+                            { label: 'Airline Charge', value: Number(lead.airlineCharge) > 0 ? `${lead.currency || 'USD'} ${Number(lead.airlineCharge).toLocaleString()}` : '—' },
+                            { label: 'Consolidator Charge', value: Number(lead.airlineConsolidatorCharge) > 0 ? `${lead.currency || 'USD'} ${Number(lead.airlineConsolidatorCharge).toLocaleString()}` : '—' },
+                          ]
+                        : []),
+                      { label: 'Total Amount', value: Number(lead.totalAmount) > 0 ? `${lead.currency || 'USD'} ${Number(lead.totalAmount).toLocaleString()}` : 'Not Quoted', bold: true, highlight: Number(lead.totalAmount) > 0 },
                       { label: 'Departure Date', value: travelDateFormatted },
                       ...(lead.tripType !== 'One Way' ? [{ label: 'Return Date', value: returnDateFormatted }] : []),
                       { label: 'PNR', value: lead.pnr || '—', mono: true, highlight: !!lead.pnr },
@@ -2500,7 +2550,9 @@ export default function LeadDetailPage() {
                         { tag: '{{travel_date}}', value: lead.travelDate ? new Date(lead.travelDate).toLocaleDateString() : '—', label: 'Travel Date' },
                         { tag: '{{return_date}}', value: lead.returnDate ? new Date(lead.returnDate).toLocaleDateString() : '—', label: 'Return Date' },
                         { tag: '{{pax}}', value: String(lead.pax), label: 'Pax Count' },
-                        { tag: '{{price}}', value: lead.priceQuoted ? `${lead.currency || 'USD'} ${lead.priceQuoted}` : '—', label: 'Price' },
+                        { tag: '{{total_amount}}', value: lead.totalAmount ? `${lead.currency || 'USD'} ${lead.totalAmount}` : '—', label: 'Total Amount' },
+                        { tag: '{{airline_charge}}', value: lead.airlineCharge ? `${lead.currency || 'USD'} ${lead.airlineCharge}` : '—', label: 'Airline Charge' },
+                        { tag: '{{airline_consolidator_charge}}', value: lead.airlineConsolidatorCharge ? `${lead.currency || 'USD'} ${lead.airlineConsolidatorCharge}` : '—', label: 'Consolidator Charge' },
                         { tag: '{{pnr}}', value: lead.pnr || '—', label: 'PNR' },
                         { tag: '{{ticket_number}}', value: lead.ticketNumber || '—', label: 'Ticket #' },
                         { tag: '{{invoice_number}}', value: lead.invoiceNumber || '—', label: 'Invoice #' },
@@ -2859,7 +2911,7 @@ export default function LeadDetailPage() {
                 ['Booking Type', editForm.bookingType],
                 ['Status', editForm.status],
                 ['Trip Type', editForm.tripType],
-                ['Price', editForm.priceQuoted ? `${editForm.currency || 'USD'} ${editForm.priceQuoted}` : '—'],
+                ['Total Amount', editForm.totalAmount ? `${editForm.currency || 'USD'} ${editForm.totalAmount}` : '—'],
                 ['PNR', editForm.pnr || '—'],
                 ['Ticket #', editForm.ticketNumber || '—'],
                 ['Invoice #', editForm.invoiceNumber || '—'],

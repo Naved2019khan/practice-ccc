@@ -196,7 +196,14 @@ export interface ILead extends Document {
   ticketNumber?: string;
   invoiceNumber?: string;
   referenceNumber?: string;
-  priceQuoted?: number;
+  /** Charge paid to the airline. */
+  airlineCharge?: number;
+  /** Consolidator's charge / service fee. */
+  airlineConsolidatorCharge?: number;
+  /** Total amount — defaults to airlineCharge + airlineConsolidatorCharge but may be overridden. */
+  totalAmount?: number;
+  /** Controls how pricing is rendered in the booking template. */
+  pricingDisplayMode?: 'total' | 'breakdown';
   currency: string;
   nextFollowUpDate?: Date;
   billing?: IBilling;
@@ -481,7 +488,10 @@ const LeadSchema = new Schema<ILead>(
     ticketNumber: { type: String, trim: true },
     invoiceNumber: { type: String, trim: true },
     referenceNumber: { type: String, trim: true, index: true },
-    priceQuoted: { type: Number, default: 0 },
+    airlineCharge: { type: Number, default: 0 },
+    airlineConsolidatorCharge: { type: Number, default: 0 },
+    totalAmount: { type: Number, default: 0 },
+    pricingDisplayMode: { type: String, enum: ['total', 'breakdown'], default: 'total' },
     currency: { type: String, default: 'USD' },
     nextFollowUpDate: { type: Date, index: true },
     billing: { type: BillingSchema, default: undefined },

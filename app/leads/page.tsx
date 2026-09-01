@@ -591,7 +591,7 @@ function LeadsContent() {
                         {/* Fare */}
                         <td className="py-4 px-5">
                           <div className="font-bold text-[13px] text-ember-text-primary">
-                            {lead.priceQuoted > 0 ? `$${lead.priceQuoted.toLocaleString()}` : '—'}
+                            {Number(lead.totalAmount) > 0 ? `$${Number(lead.totalAmount).toLocaleString()}` : '—'}
                           </div>
                         </td>
 

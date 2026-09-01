@@ -105,9 +105,15 @@ function ConfirmLeadModal({ isOpen, form, isSubmitting, submitError, onConfirm, 
       label: 'Itinerary',
       value: hasItinerary ? 'PNR itinerary attached' : 'No itinerary pasted',
     },
-    ...(form.priceQuoted
-      ? [{ icon: <span className="text-[11px] font-bold">$</span>, label: 'Quoted', value: `$${Number(form.priceQuoted).toLocaleString()}` }]
-      : []),
+    ...(() => {
+      const total =
+        form.totalAmount !== undefined && String(form.totalAmount) !== ''
+          ? Number(form.totalAmount)
+          : (Number(form.airlineCharge) || 0) + (Number(form.airlineConsolidatorCharge) || 0);
+      return total
+        ? [{ icon: <span className="text-[11px] font-bold">$</span>, label: 'Total', value: `$${total.toLocaleString()}` }]
+        : [];
+    })(),
   ];
 
   return (
@@ -248,7 +254,10 @@ const EMPTY_FORM: LeadFormValues = {
   stage: 'New',
   status: DEFAULT_LEAD_STATUS,
   assignedTo: UNASSIGNED_VALUE,
-  priceQuoted: '',
+  airlineCharge: '',
+  airlineConsolidatorCharge: '',
+  totalAmount: '',
+  pricingDisplayMode: 'total',
   nextFollowUpDate: '',
   initialNote: '',
   pnrHtml: '',
@@ -295,6 +304,26 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
 
   const setField = <K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  /**
+   * Update one of the two charge fields and refresh the running total to their
+   * sum. The total remains directly editable afterward for manual overrides.
+   */
+  const onChargeChange = (
+    key: 'airlineCharge' | 'airlineConsolidatorCharge',
+    value: string
+  ) =>
+    setForm((f) => {
+      const airline = key === 'airlineCharge' ? value : String(f.airlineCharge ?? '');
+      const consolidator =
+        key === 'airlineConsolidatorCharge' ? value : String(f.airlineConsolidatorCharge ?? '');
+      const sum = (Number(airline) || 0) + (Number(consolidator) || 0);
+      return {
+        ...f,
+        [key]: value,
+        totalAmount: sum ? String(sum) : '',
+      };
+    });
 
   /**
    * Store the pasted itinerary HTML and derive the route from it, so the leads
@@ -395,7 +424,13 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
           form.assignedTo === UNASSIGNED_VALUE
             ? null
             : form.assignedTo || undefined,
-        priceQuoted: form.priceQuoted || 0,
+        airlineCharge: form.airlineCharge || 0,
+        airlineConsolidatorCharge: form.airlineConsolidatorCharge || 0,
+        totalAmount:
+          form.totalAmount !== undefined && String(form.totalAmount) !== ''
+            ? form.totalAmount
+            : (Number(form.airlineCharge) || 0) + (Number(form.airlineConsolidatorCharge) || 0),
+        pricingDisplayMode: form.pricingDisplayMode || 'total',
         nextFollowUpDate: form.nextFollowUpDate || undefined,
         initialNote: form.initialNote,
         billing: {
@@ -642,18 +677,59 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
               <option value="Ticketed">Ticketed</option>
             </Select>
 
+            <div className="hidden sm:block" />
+          </FormRow>
+
+          {/* Pricing: airline + consolidator charge, total auto-calculates (editable) */}
+          <FormRow cols={2}>
             <Input
-              ref={registerField('priceQuoted')}
-              label="Quoted Price ($)"
+              ref={registerField('airlineCharge')}
+              label="Airline Charge ($)"
               type="number"
               min={0}
               step="0.01"
-              placeholder="e.g. 1450"
-              value={String(form.priceQuoted ?? '')}
-              onChange={(e) => setField('priceQuoted', e.target.value)}
-              onBlur={blur('priceQuoted')}
-              error={errorFor('priceQuoted')}
+              placeholder="e.g. 1200"
+              value={String(form.airlineCharge ?? '')}
+              onChange={(e) => onChargeChange('airlineCharge', e.target.value)}
+              onBlur={blur('airlineCharge')}
+              error={errorFor('airlineCharge')}
             />
+            <Input
+              ref={registerField('airlineConsolidatorCharge')}
+              label="Airline Consolidator Charge ($)"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="e.g. 250"
+              value={String(form.airlineConsolidatorCharge ?? '')}
+              onChange={(e) => onChargeChange('airlineConsolidatorCharge', e.target.value)}
+              onBlur={blur('airlineConsolidatorCharge')}
+              error={errorFor('airlineConsolidatorCharge')}
+            />
+          </FormRow>
+
+          <FormRow cols={2}>
+            <Input
+              ref={registerField('totalAmount')}
+              label="Total Amount ($)"
+              labelHint="Auto = Airline + Consolidator · editable"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="0.00"
+              value={String(form.totalAmount ?? '')}
+              onChange={(e) => setField('totalAmount', e.target.value)}
+              onBlur={blur('totalAmount')}
+              error={errorFor('totalAmount')}
+            />
+            <Select
+              label="Template Pricing Display"
+              value={String(form.pricingDisplayMode ?? 'total')}
+              onChange={(e) => setField('pricingDisplayMode', e.target.value as 'total' | 'breakdown')}
+            >
+              <option value="total">Show Total Amount only</option>
+              <option value="breakdown">Show all three (breakdown)</option>
+            </Select>
           </FormRow>
 
           <FormRow cols={2}>

@@ -156,7 +156,7 @@ function buildCsNotificationHtml(
                   <span style="font-weight:700;color:${lead.paymentStatus === 'Authorized' || lead.paymentStatus === 'Paid' ? '#16A34A' : '#D97706'};">
                     ${esc(lead.paymentStatus || 'Pending')}
                   </span>
-                  &bull; <strong>${esc(lead.currency || 'USD')} ${esc(Number(lead.priceQuoted || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }))}</strong>
+                  &bull; <strong>${esc(lead.currency || 'USD')} ${esc(Number(lead.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }))}</strong>
                 </td>
               </tr>
             </table>
@@ -461,7 +461,10 @@ export async function GET(
       pnr: lead.pnr,
       ticketNumber: lead.ticketNumber,
       invoiceNumber: lead.invoiceNumber,
-      priceQuoted: lead.priceQuoted,
+      airlineCharge: lead.airlineCharge,
+      airlineConsolidatorCharge: lead.airlineConsolidatorCharge,
+      totalAmount: lead.totalAmount,
+      pricingDisplayMode: lead.pricingDisplayMode,
       currency: lead.currency || 'USD',
       flightLegs: lead.flightLegs || [],
       passengers: lead.passengers || [],

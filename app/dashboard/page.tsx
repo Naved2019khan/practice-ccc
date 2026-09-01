@@ -275,9 +275,9 @@ export default function DashboardPage() {
 
                       <div className="flex items-center justify-between pt-1 border-t border-ember-border text-[11px]">
                         <FollowUpBadge date={lead.nextFollowUpDate} />
-                        {lead.priceQuoted > 0 && (
+                        {Number(lead.totalAmount) > 0 && (
                           <span className="font-bold text-ember-text-primary">
-                            ${lead.priceQuoted}
+                            ${Number(lead.totalAmount).toLocaleString()}
                           </span>
                         )}
                       </div>

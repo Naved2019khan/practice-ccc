@@ -133,7 +133,7 @@ function buildCsAuthNotificationHtml(
                   <span style="font-weight:800;color:#16A34A;background:#DCFCE7;padding:2px 8px;border-radius:4px;">
                     Authorized
                   </span>
-                  &bull; <strong>${esc(lead.currency || 'USD')} ${esc(Number(lead.priceQuoted || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }))}</strong>
+                  &bull; <strong>${esc(lead.currency || 'USD')} ${esc(Number(lead.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }))}</strong>
                   ${cardLast4 ? `<span style="margin-left:6px;color:#64748B;font-size:12px;">(${esc(cardBrand)} &bull;&bull;&bull;&bull; ${esc(cardLast4)})</span>` : ''}
                 </td>
               </tr>

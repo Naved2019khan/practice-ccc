@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
       'Payment Status': l.paymentStatus,
       'PNR / Reference': l.pnr || '',
       'Invoice Number': l.invoiceNumber || '',
-      'Quoted Price': l.priceQuoted || 0,
+      'Airline Charge': l.airlineCharge || 0,
+      'Airline Consolidator Charge': l.airlineConsolidatorCharge || 0,
+      'Total Amount': l.totalAmount || 0,
       Currency: l.currency || 'USD',
       'Next Follow-Up': l.nextFollowUpDate
         ? new Date(l.nextFollowUpDate).toISOString().split('T')[0]

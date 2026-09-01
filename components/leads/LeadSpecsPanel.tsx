@@ -82,6 +82,18 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
   onReassign,
 }) => {
   const set = (patch: any) => setEditForm({ ...editForm, ...patch });
+
+  /**
+   * Update a charge field and refresh the total to the sum of both charges.
+   * The Total Amount field stays editable for manual overrides afterward.
+   */
+  const setCharge = (key: 'airlineCharge' | 'airlineConsolidatorCharge', value: string) => {
+    const airline = key === 'airlineCharge' ? value : (editForm.airlineCharge ?? '');
+    const consolidator =
+      key === 'airlineConsolidatorCharge' ? value : (editForm.airlineConsolidatorCharge ?? '');
+    const sum = (Number(airline) || 0) + (Number(consolidator) || 0);
+    set({ [key]: value, totalAmount: sum ? String(sum) : '' });
+  };
   const billing = editForm.billing || {};
   const address = billing.address || {};
   const card = billing.card || {};
@@ -121,10 +133,21 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Input label="Price Quoted" type="number" min={0} step="0.01" placeholder="0.00" value={editForm.priceQuoted ?? ''} onChange={(e) => set({ priceQuoted: e.target.value })} />
+            <Input label="Airline Charge" type="number" min={0} step="0.01" placeholder="0.00" value={editForm.airlineCharge ?? ''} onChange={(e) => setCharge('airlineCharge', e.target.value)} />
+            <Input label="Airline Consolidator Charge" type="number" min={0} step="0.01" placeholder="0.00" value={editForm.airlineConsolidatorCharge ?? ''} onChange={(e) => setCharge('airlineConsolidatorCharge', e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="Total Amount" labelHint="Auto = sum · editable" type="number" min={0} step="0.01" placeholder="0.00" value={editForm.totalAmount ?? ''} onChange={(e) => set({ totalAmount: e.target.value })} />
             <Select label="Currency" value={editForm.currency || 'USD'} onChange={(e) => set({ currency: e.target.value })}>
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select label="Template Pricing Display" value={editForm.pricingDisplayMode || 'total'} onChange={(e) => set({ pricingDisplayMode: e.target.value })}>
+              <option value="total">Show Total Amount only</option>
+              <option value="breakdown">Show all three (breakdown)</option>
+            </Select>
+            <div />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Input label="PNR / Reference" value={editForm.pnr || ''} onChange={(e) => set({ pnr: e.target.value })} />
@@ -138,8 +161,9 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="Agent / Concierge"
-              placeholder="e.g. Admin / Concierge Team"
+              label="Sender Name"
+              labelHint="Shown as Agent / Concierge in template"
+              placeholder="Airlineconsolidator team"
               value={editForm.agentName ?? ''}
               onChange={(e) => set({ agentName: e.target.value })}
             />
@@ -294,11 +318,14 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
         {/* Booking summary */}
         <div className="space-y-0 text-xs divide-y divide-ember-border/60">
           {[
-            { label: 'Quoted Fare', value: lead.priceQuoted > 0 ? `${lead.currency || 'USD'} ${lead.priceQuoted.toLocaleString()}` : 'Not Quoted', highlight: lead.priceQuoted > 0 },
+            { label: 'Airline Charge', value: Number(lead.airlineCharge) > 0 ? `${lead.currency || 'USD'} ${Number(lead.airlineCharge).toLocaleString()}` : '—' },
+            { label: 'Consolidator Charge', value: Number(lead.airlineConsolidatorCharge) > 0 ? `${lead.currency || 'USD'} ${Number(lead.airlineConsolidatorCharge).toLocaleString()}` : '—' },
+            { label: 'Total Amount', value: Number(lead.totalAmount) > 0 ? `${lead.currency || 'USD'} ${Number(lead.totalAmount).toLocaleString()}` : 'Not Quoted', highlight: Number(lead.totalAmount) > 0 },
+            { label: 'Template Pricing', value: lead.pricingDisplayMode === 'breakdown' ? 'All three (breakdown)' : 'Total only' },
             { label: 'PNR', value: lead.pnr || '—', mono: true, highlight: !!lead.pnr },
             { label: 'Ticket #', value: lead.ticketNumber || '—', mono: true },
             { label: 'Invoice #', value: lead.invoiceNumber || '—', mono: true },
-            { label: 'Agent / Concierge', value: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || 'Concierge Team' },
+            { label: 'Sender Name', value: lead.agentName || (lead.assignedTo && typeof lead.assignedTo === 'object' ? lead.assignedTo.name : '') || 'Airlineconsolidator team' },
             { label: 'Payment', value: lead.paymentStatus },
             { label: 'Next Follow-Up', value: followUp },
           ].map(({ label, value, mono, highlight }: any) => (

@@ -80,6 +80,11 @@ export interface TemplateVariables {
 
   // Pricing
   price?: string;
+  total_amount?: string;
+  airline_charge?: string;
+  airline_consolidator_charge?: string;
+  /** Prebuilt pricing table HTML, honoring pricingDisplayMode (total vs breakdown). */
+  pricing_block_html?: string;
   currency?: string;
 
   // Payment / billing
@@ -146,14 +151,18 @@ const DEFAULT_FALLBACKS: Record<string, string> = {
   flight2_arr_city: 'City',
   flight2_arr_datetime: 'Schedule Pending',
   price: '0.00',
+  total_amount: '0.00',
+  airline_charge: '0.00',
+  airline_consolidator_charge: '0.00',
+  pricing_block_html: '',
   currency: 'USD',
   card_brand: 'Credit Card',
   card_holder_name: 'Cardholder',
   card_last4: '****',
   billing_address: 'On file / Verified',
-  agent_name: 'Concierge Team',
-  concierge_name: 'Concierge Team',
-  agent_concierge: 'Concierge Team',
+  agent_name: 'Airlineconsolidator team',
+  concierge_name: 'Airlineconsolidator team',
+  agent_concierge: 'Airlineconsolidator team',
   agent_email: 'concierge@airlinesconsolidator.com',
   agent_phone: '+1 (888) 883-0727',
   company_name: 'AirlinesConsolidator',
@@ -590,11 +599,41 @@ export function buildTemplateVariables(
     lead.agentName ||
     agentName ||
     (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.name : '') ||
-    'Concierge Team';
+    'Airlineconsolidator team';
   const resolvedAgentEmail =
     agentEmail || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.email : '') || 'concierge@airlinesconsolidator.com';
   const resolvedAgentPhone =
     agentPhone || (assignedAgent && typeof assignedAgent === 'object' ? assignedAgent.phone : '') || '+1 (888) 883-0727';
+
+  // Pricing: airline charge + consolidator charge = total (total may be overridden).
+  const currencyCode = lead.currency || 'USD';
+  const fmtMoney = (n: number) =>
+    Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const airlineChargeNum = Number(lead.airlineCharge || 0);
+  const consolidatorChargeNum = Number(lead.airlineConsolidatorCharge || 0);
+  const totalAmountNum =
+    lead.totalAmount !== undefined && lead.totalAmount !== null && Number(lead.totalAmount) > 0
+      ? Number(lead.totalAmount)
+      : airlineChargeNum + consolidatorChargeNum;
+  const showBreakdown = lead.pricingDisplayMode === 'breakdown';
+
+  // Row style helpers for the pricing block table.
+  const priceRow = (label: string, value: string, strong = false) =>
+    `<tr>
+      <td style="font-size:${strong ? '13px' : '12.5px'}; font-weight:${strong ? '700' : '600'}; color:${strong ? '#5a4300' : '#7a5c00'}; padding:${strong ? '10px 0 0 0' : '2px 0'};${strong ? 'border-top:1px solid rgba(90,67,0,0.25);' : ''} text-transform:${strong ? 'uppercase' : 'none'}; letter-spacing:${strong ? '0.5px' : '0'};">${label}</td>
+      <td align="right" style="font-size:${strong ? '20px' : '13px'}; font-weight:${strong ? '800' : '700'}; color:${strong ? '#0B3C8A' : '#1a2b4c'}; padding:${strong ? '10px 0 0 0' : '2px 0'};${strong ? 'border-top:1px solid rgba(90,67,0,0.25);' : ''}">${value}</td>
+    </tr>`;
+
+  const pricingRowsHtml = showBreakdown
+    ? [
+        priceRow('Airline Charge', `${currencyCode} ${fmtMoney(airlineChargeNum)}`),
+        priceRow('Airline Consolidator Charge', `${currencyCode} ${fmtMoney(consolidatorChargeNum)}`),
+        priceRow('Total Booking Amount', `${currencyCode} ${fmtMoney(totalAmountNum)}`, true),
+      ].join('')
+    : priceRow('Total Booking Amount', `${currencyCode} ${fmtMoney(totalAmountNum)}`, true);
+
+  const pricingBlockHtml =
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${pricingRowsHtml}</table>`;
 
   return {
     // Passenger & Contact
@@ -650,11 +689,15 @@ export function buildTemplateVariables(
     flight2_arr_city: isRoundTrip ? (leg2?.arrivingAirport || lead.originCity || lead.origin || 'City') : '',
     flight2_arr_datetime: arr2DateFormatted,
 
-    // Pricing
-    price: lead.priceQuoted
-      ? Number(lead.priceQuoted).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : '0.00',
-    currency: lead.currency || 'USD',
+    // Pricing — total is the headline figure; charges are the breakdown.
+    price: fmtMoney(totalAmountNum),
+    total_amount: fmtMoney(totalAmountNum),
+    airline_charge: fmtMoney(airlineChargeNum),
+    airline_consolidator_charge: fmtMoney(consolidatorChargeNum),
+    // Ready-made HTML block that respects the lead's pricingDisplayMode
+    // (total only, or full airline + consolidator + total breakdown).
+    pricing_block_html: pricingBlockHtml,
+    currency: currencyCode,
 
     // Payment / Billing
     card_brand: card?.brand || 'Visa',

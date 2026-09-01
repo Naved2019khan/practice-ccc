@@ -88,7 +88,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       pnrHtml,
       ticketNumber,
       invoiceNumber,
-      priceQuoted,
+      airlineCharge,
+      airlineConsolidatorCharge,
+      totalAmount,
+      pricingDisplayMode,
       currency,
       nextFollowUpDate,
       billing,
@@ -256,12 +259,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (ticketNumber !== undefined) lead.ticketNumber = ticketNumber?.trim() || '';
     if (invoiceNumber !== undefined) lead.invoiceNumber = invoiceNumber?.trim() || '';
     if (agentName !== undefined) {
-      lead.agentName = agentName?.trim() || '';
-    } else if (!lead.agentName && lead.assignedTo) {
-      const staffUser = await User.findById(lead.assignedTo);
-      if (staffUser) lead.agentName = staffUser.name;
+      // Sender name: use the entered value, else fall back to the default team name.
+      lead.agentName = agentName?.trim() || 'Airlineconsolidator team';
+    } else if (!lead.agentName) {
+      lead.agentName = 'Airlineconsolidator team';
     }
-    if (priceQuoted !== undefined) lead.priceQuoted = isNaN(Number(priceQuoted)) ? 0 : Number(priceQuoted);
+    if (airlineCharge !== undefined) lead.airlineCharge = isNaN(Number(airlineCharge)) ? 0 : Number(airlineCharge);
+    if (airlineConsolidatorCharge !== undefined) lead.airlineConsolidatorCharge = isNaN(Number(airlineConsolidatorCharge)) ? 0 : Number(airlineConsolidatorCharge);
+    if (totalAmount !== undefined) {
+      // Explicit override (blank falls back to the sum of the two charges).
+      lead.totalAmount = String(totalAmount) === '' || isNaN(Number(totalAmount))
+        ? Number(lead.airlineCharge || 0) + Number(lead.airlineConsolidatorCharge || 0)
+        : Number(totalAmount);
+    } else if (airlineCharge !== undefined || airlineConsolidatorCharge !== undefined) {
+      // Keep total in step when charges change but no explicit total was sent.
+      lead.totalAmount = Number(lead.airlineCharge || 0) + Number(lead.airlineConsolidatorCharge || 0);
+    }
+    if (pricingDisplayMode !== undefined) {
+      lead.pricingDisplayMode = pricingDisplayMode === 'breakdown' ? 'breakdown' : 'total';
+    }
     if (currency !== undefined) lead.currency = currency;
     if (nextFollowUpDate !== undefined) lead.nextFollowUpDate = parseDateSafe(nextFollowUpDate);
     if (remarks !== undefined) {

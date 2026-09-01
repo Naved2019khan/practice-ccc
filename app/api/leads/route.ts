@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       });
 
       const ticketedLeads = await Lead.find({ ...query, stage: 'Ticketed' });
-      const bookedRevenue = ticketedLeads.reduce((sum, l) => sum + (l.priceQuoted || 0), 0);
+      const bookedRevenue = ticketedLeads.reduce((sum, l) => sum + (l.totalAmount || 0), 0);
 
       // Stage breakdown
       const stages = ['New', 'Contacted', 'Quoted', 'Negotiation', 'Booked', 'Ticketed', 'Lost'];
@@ -188,13 +188,23 @@ export async function POST(req: NextRequest) {
       pnrHtml,
       ticketNumber,
       invoiceNumber,
-      priceQuoted = 0,
+      airlineCharge = 0,
+      airlineConsolidatorCharge = 0,
+      totalAmount,
+      pricingDisplayMode = 'total',
       currency = 'USD',
       nextFollowUpDate,
       initialNote,
       remarks,
       billing: rawBilling,
     } = body;
+
+    // Total defaults to the sum of the two charges but may be overridden.
+    const computedTotal =
+      totalAmount !== undefined && totalAmount !== null && String(totalAmount) !== ''
+        ? Number(totalAmount)
+        : Number(airlineCharge || 0) + Number(airlineConsolidatorCharge || 0);
+    const resolvedTotal = isNaN(computedTotal) ? 0 : computedTotal;
 
     if (!phone) {
       return NextResponse.json(
@@ -217,7 +227,9 @@ export async function POST(req: NextRequest) {
       pax,
       tripType,
       passengers: body.passengers,
-      priceQuoted,
+      airlineCharge,
+      airlineConsolidatorCharge,
+      totalAmount,
       nextFollowUpDate,
       billing: rawBilling
         ? {
@@ -465,7 +477,10 @@ export async function POST(req: NextRequest) {
       ticketNumber: ticketNumber?.trim(),
       invoiceNumber: finalRef,
       referenceNumber: finalRef,
-      priceQuoted: Number(priceQuoted) || 0,
+      airlineCharge: Number(airlineCharge) || 0,
+      airlineConsolidatorCharge: Number(airlineConsolidatorCharge) || 0,
+      totalAmount: resolvedTotal,
+      pricingDisplayMode: pricingDisplayMode === 'breakdown' ? 'breakdown' : 'total',
       currency,
       nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : undefined,
       remarks: remarks || initialNote || '',
