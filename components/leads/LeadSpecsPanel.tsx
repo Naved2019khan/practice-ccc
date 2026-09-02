@@ -22,6 +22,7 @@ import { PassengerList } from '@/components/leads/PassengerList';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { extractRouteFromHtml } from '@/lib/pnrHtmlExtract';
 import { BOOKING_TYPES, LEAD_STATUSES, statusTone, bookingTypeShort } from '@/lib/leadOptions';
+import { formatDateOnly } from '@/lib/validation';
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AED', 'PKR', 'INR', 'SAR'];
 
@@ -363,7 +364,7 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
                   <div>
                     <span className="text-[10px] uppercase tracking-wide text-ember-neutral block mb-0.5">Date of Birth</span>
                     <span className="font-semibold text-ember-text-primary">
-                      {pax.dob ? new Date(pax.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : <span className="text-ember-neutral italic font-normal">—</span>}
+                      {pax.dob ? formatDateOnly(pax.dob) : <span className="text-ember-neutral italic font-normal">—</span>}
                     </span>
                   </div>
                   <div>

@@ -44,6 +44,7 @@ import {
   detectCardBrand,
   cvvLength,
   hasCardInput,
+  formatDateOnly,
   type LeadFormValues,
   type BillingFormValues,
   type CardFormValues,
@@ -76,10 +77,7 @@ function ConfirmLeadModal({ isOpen, form, isSubmitting, submitError, onConfirm, 
   const dial = getDialCode(form.phoneDialCode);
   const hasItinerary = Boolean(form.pnrHtml && String(form.pnrHtml).trim());
 
-  const formatDob = (dob?: string) =>
-    dob
-      ? new Date(dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      : '—';
+  const formatDob = (dob?: string) => formatDateOnly(dob) || '—';
 
   const rows: { icon: React.ReactNode; label: string; value: string }[] = [
     {
