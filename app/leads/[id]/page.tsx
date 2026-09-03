@@ -54,7 +54,7 @@ import { LeadSpecsPanel } from '@/components/leads/LeadSpecsPanel';
 import { useToast } from '@/context/ToastContext';
 import { buildTemplateVariables, substituteTemplateVariables } from '@/lib/templateUtils';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { lettersAndSpacesOnly } from '@/lib/validation';
+import { lettersAndSpacesOnly, formatDateOnly } from '@/lib/validation';
 import { HtmlPnrConverter } from '@/components/leads/HtmlPnrConverter';
 import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import { resolveDateTime } from '@/lib/pnr/enricher';
@@ -1955,7 +1955,7 @@ export default function LeadDetailPage() {
                               <span className="text-[10px] uppercase tracking-wide text-ember-neutral block mb-0.5">Date of Birth</span>
                               <span className="font-semibold text-ember-text-primary">
                                 {pax.dob
-                                  ? new Date(pax.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                  ? formatDateOnly(pax.dob)
                                   : <span className="text-ember-neutral italic font-normal">Not provided</span>}
                               </span>
                             </div>

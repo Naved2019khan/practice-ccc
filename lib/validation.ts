@@ -227,6 +227,28 @@ export const parseDateInput = (value: string): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
+/**
+ * Formats a date-only value (`yyyy-mm-dd`, e.g. a DOB) for display WITHOUT any
+ * timezone conversion. Never use `new Date("yyyy-mm-dd")` for date-only fields:
+ * it parses as UTC midnight and `toLocaleDateString` then renders it in local
+ * time, shifting the day by ±1. This parses the parts as local-midnight so the
+ * displayed day always matches the day the user selected.
+ *
+ * @param value  `yyyy-mm-dd` string (extra time component, if any, is ignored)
+ * @returns e.g. `"May 15, 1999"`, or `''` when the input is blank/invalid.
+ */
+export const formatDateOnly = (
+  value?: string | null,
+  options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' },
+): string => {
+  if (!value) return '';
+  // Take just the date portion in case an ISO datetime slipped through.
+  const datePart = String(value).slice(0, 10);
+  const d = parseDateInput(datePart);
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', options);
+};
+
 /* --------------------------------------------------------------- the form */
 
 /** Fields that must always be present, in tab order. */
