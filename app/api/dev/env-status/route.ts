@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { getS3Config } from '@/lib/s3';
-import { getSmtpConfig } from '@/lib/ses-smtp';
+import { getSmtpConfig, getGodaddyConfig } from '@/lib/ses-smtp';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
 
     const s3Config = getS3Config();
     const smtpConfig = getSmtpConfig();
+    const gdConfig = getGodaddyConfig();
     const activeProvider = process.env.EMAIL_PROVIDER || 'gmail';
 
     return NextResponse.json({
@@ -54,6 +55,16 @@ export async function GET(req: NextRequest) {
             : '***'
           : null,
         defaultFromEmail: process.env.SES_FROM_EMAIL || process.env.GMAIL_FROM_EMAIL || 'Flight CRM <notifications@flightcrm.com>',
+      },
+      godaddy: {
+        isConfigured: gdConfig.isConfigured,
+        host: gdConfig.host,
+        port: gdConfig.port,
+        hasUser: Boolean(gdConfig.user),
+        hasPassword: gdConfig.hasPassword,
+        maskedUser: gdConfig.maskedUser,
+        fromEmail: gdConfig.fromEmail,
+        defaultFromEmail: gdConfig.fromEmail,
       },
     });
   } catch (error: any) {

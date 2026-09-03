@@ -244,7 +244,7 @@ export const LeadSpecsPanel: React.FC<LeadSpecsPanelProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Input label="Expiry (MM/YY)" placeholder="MM/YY" maxLength={5} value={card.expiry || ''} onChange={(e) => setCard({ expiry: e.target.value })} className="font-code" />
-                <Input label="CVV / CVC" type="password" placeholder="CVV" maxLength={4} value={card.cvv || ''} onChange={(e) => setCard({ cvv: e.target.value })} className="font-code tracking-widest" />
+                <Input label="CVV / CVC" type="text" placeholder="CVV" maxLength={4} value={card.cvv || ''} onChange={(e) => setCard({ cvv: e.target.value })} className="font-code tracking-widest" />
               </div>
             </div>
           </div>

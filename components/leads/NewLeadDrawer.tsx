@@ -130,9 +130,8 @@ function ConfirmLeadModal({ isOpen, form, isSubmitting, submitError, onConfirm, 
           {rows.map((row, i) => (
             <div
               key={row.label}
-              className={`flex items-start gap-3 px-4 py-3 ${
-                i < rows.length - 1 ? 'border-b border-ember-border' : ''
-              } ${i % 2 === 0 ? 'bg-ember-surface' : 'bg-ember-bg/40'}`}
+              className={`flex items-start gap-3 px-4 py-3 ${i < rows.length - 1 ? 'border-b border-ember-border' : ''
+                } ${i % 2 === 0 ? 'bg-ember-surface' : 'bg-ember-bg/40'}`}
             >
               <span className="mt-0.5 text-ember-neutral shrink-0">{row.icon}</span>
               <span className="text-xs text-ember-neutral w-24 shrink-0">{row.label}</span>
@@ -450,11 +449,11 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
           countryCode: billing.countryCode,
           card: hasCardInput(card)
             ? {
-                holderName: card.holderName,
-                number: digitsOnly(String(card.number ?? '')),
-                expiry: card.expiry,
-                cvv: card.cvv,
-              }
+              holderName: card.holderName,
+              number: digitsOnly(String(card.number ?? '')),
+              expiry: card.expiry,
+              cvv: card.cvv,
+            }
             : undefined,
         },
       };
@@ -500,506 +499,506 @@ export const NewLeadDrawer: React.FC<NewLeadDrawerProps> = ({
       />
 
       <Drawer
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Add New Flight Lead"
-      description="Enter passenger flight requirements. If unassigned and auto-assign is on, it will be round-robined."
-      width="4xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          {errorCount > 0 ? (
-            <p className="flex items-center gap-1.5 text-[11px] text-ember-error font-medium">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              Please fix {errorCount} {errorCount === 1 ? 'field' : 'fields'} before creating this lead.
-            </p>
-          ) : (
-            <p className="text-[11px] text-ember-neutral">
-              <span className="text-ember-error font-bold">*</span> Required fields
-            </p>
-          )}
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="secondary" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button type="submit" form="new-lead-form" isLoading={isSubmitting}>
-              Create Flight Lead
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      {/* noValidate: `validateLeadForm` owns the messaging, so native browser
-          bubbles don't fire alongside it. */}
-      <form id="new-lead-form" onSubmit={handleSubmit} noValidate className="space-y-7">
-        {submitError && !showConfirm && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 p-3 rounded-btn bg-red-50 border border-ember-error/30"
-          >
-            <AlertCircle className="w-4 h-4 text-ember-error shrink-0 mt-0.5" />
-            <div className="text-xs text-ember-error">{submitError}</div>
-          </div>
-        )}
-
-        {/* ------------------------------------------- Customer Details */}
-        <FormSection
-          title="Customer Details"
-          description="Who is travelling and how to reach them."
-          icon={<UserIcon className="w-3.5 h-3.5" />}
-        >
-          <FormRow cols={2}>
-            <PhoneField
-              ref={registerField('phone')}
-              label="Phone Number"
-              required
-              countryCode={String(form.phoneDialCode ?? DEFAULT_COUNTRY_CODE)}
-              onCountryCodeChange={(code) => setField('phoneDialCode', code)}
-              value={String(form.phone ?? '')}
-              onValueChange={(v) => setField('phone', v)}
-              onBlur={blur('phone')}
-              error={errorFor('phone')}
-            />
-            <Input
-              ref={registerField('email')}
-              label="Email Address"
-              labelHint="Optional"
-              type="email"
-              placeholder="john@example.com"
-              autoComplete="email"
-              value={String(form.email ?? '')}
-              onChange={(e) => setField('email', e.target.value)}
-              onBlur={blur('email')}
-              error={errorFor('email')}
-            />
-          </FormRow>
-
-          <Select
-            label="Lead Source"
-            value={String(form.source ?? 'Website')}
-            onChange={(e) => setField('source', e.target.value)}
-          >
-            <option value="Website">Website</option>
-            <option value="Contact Us">Contact Us</option>
-            <option value="Referral">Referral</option>
-            <option value="Phone">Phone Inquiry</option>
-            <option value="Ads">Meta / Google Ads</option>
-            <option value="Newsletter">Newsletter</option>
-            <option value="Walk-in">Walk-in</option>
-            <option value="Other">Other</option>
-          </Select>
-        </FormSection>
-
-        {/* --------------------------------------------- Flight Details */}
-        <FormSection
-          title="Flight Details"
-          description="Route, dates and itinerary requirements."
-          icon={<Plane className="w-3.5 h-3.5" />}
-        >
-          {/* -------- Import Itinerary (paste converted HTML) */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide">
-              <FileText className="w-3.5 h-3.5 text-ember-primary" />
-              <span>Import Itinerary (PNR / GDS)</span>
-            </div>
-            <HtmlPnrConverter
-              value={String(form.pnrHtml ?? '')}
-              onChange={handlePnrHtmlChange}
-            />
-            {(form.origin || form.destination) && (
-              <p className="flex items-center gap-1.5 text-[11px] text-ember-primary font-semibold">
-                <MapPin className="w-3.5 h-3.5 shrink-0" />
-                Route detected: {form.origin || '—'} → {form.destination || '—'}
+        isOpen={isOpen}
+        onClose={handleClose}
+        title="Add New Flight Lead"
+        description="Enter passenger flight requirements. If unassigned and auto-assign is on, it will be round-robined."
+        width="4xl"
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            {errorCount > 0 ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-ember-error font-medium">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                Please fix {errorCount} {errorCount === 1 ? 'field' : 'fields'} before creating this lead.
+              </p>
+            ) : (
+              <p className="text-[11px] text-ember-neutral">
+                <span className="text-ember-error font-bold">*</span> Required fields
               </p>
             )}
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="secondary" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button type="submit" form="new-lead-form" isLoading={isSubmitting}>
+                Create Flight Lead
+              </Button>
+            </div>
           </div>
-
-          {/* -------- Booking classification (always shown) */}
-          <FormRow cols={2}>
-            <Select
-              label="Booking Type"
-              value={String(form.bookingType ?? DEFAULT_BOOKING_TYPE)}
-              onChange={(e) => setField('bookingType', e.target.value)}
-              helperText="What the customer is asking for."
+        }
+      >
+        {/* noValidate: `validateLeadForm` owns the messaging, so native browser
+          bubbles don't fire alongside it. */}
+        <form id="new-lead-form" onSubmit={handleSubmit} noValidate className="space-y-7">
+          {submitError && !showConfirm && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 p-3 rounded-btn bg-red-50 border border-ember-error/30"
             >
-              {BOOKING_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
+              <AlertCircle className="w-4 h-4 text-ember-error shrink-0 mt-0.5" />
+              <div className="text-xs text-ember-error">{submitError}</div>
+            </div>
+          )}
+
+          {/* ------------------------------------------- Customer Details */}
+          <FormSection
+            title="Customer Details"
+            description="Who is travelling and how to reach them."
+            icon={<UserIcon className="w-3.5 h-3.5" />}
+          >
+            <FormRow cols={2}>
+              <PhoneField
+                ref={registerField('phone')}
+                label="Phone Number"
+                required
+                countryCode={String(form.phoneDialCode ?? DEFAULT_COUNTRY_CODE)}
+                onCountryCodeChange={(code) => setField('phoneDialCode', code)}
+                value={String(form.phone ?? '')}
+                onValueChange={(v) => setField('phone', v)}
+                onBlur={blur('phone')}
+                error={errorFor('phone')}
+              />
+              <Input
+                ref={registerField('email')}
+                label="Email Address"
+                labelHint="Optional"
+                type="email"
+                placeholder="john@example.com"
+                autoComplete="email"
+                value={String(form.email ?? '')}
+                onChange={(e) => setField('email', e.target.value)}
+                onBlur={blur('email')}
+                error={errorFor('email')}
+              />
+            </FormRow>
 
             <Select
-              label="Status"
-              value={String(form.status ?? DEFAULT_LEAD_STATUS)}
-              onChange={(e) => setField('status', e.target.value)}
-              helperText="Operational state."
+              label="Lead Source"
+              value={String(form.source ?? 'Website')}
+              onChange={(e) => setField('source', e.target.value)}
             >
-              {LEAD_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              <option value="Website">Website</option>
+              <option value="Contact Us">Contact Us</option>
+              <option value="Referral">Referral</option>
+              <option value="Phone">Phone Inquiry</option>
+              <option value="Ads">Meta / Google Ads</option>
+              <option value="Newsletter">Newsletter</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Other">Other</option>
             </Select>
-          </FormRow>
+          </FormSection>
 
-          {/* Flight route/date details removed — itinerary is captured via the
+          {/* --------------------------------------------- Flight Details */}
+          <FormSection
+            title="Flight Details"
+            description="Route, dates and itinerary requirements."
+            icon={<Plane className="w-3.5 h-3.5" />}
+          >
+            {/* -------- Import Itinerary (paste converted HTML) */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide">
+                <FileText className="w-3.5 h-3.5 text-ember-primary" />
+                <span>Import Itinerary (PNR / GDS)</span>
+              </div>
+              <HtmlPnrConverter
+                value={String(form.pnrHtml ?? '')}
+                onChange={handlePnrHtmlChange}
+              />
+              {(form.origin || form.destination) && (
+                <p className="flex items-center gap-1.5 text-[11px] text-ember-primary font-semibold">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" />
+                  Route detected: {form.origin || '—'} → {form.destination || '—'}
+                </p>
+              )}
+            </div>
+
+            {/* -------- Booking classification (always shown) */}
+            <FormRow cols={2}>
+              <Select
+                label="Booking Type"
+                value={String(form.bookingType ?? DEFAULT_BOOKING_TYPE)}
+                onChange={(e) => setField('bookingType', e.target.value)}
+                helperText="What the customer is asking for."
+              >
+                {BOOKING_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                label="Status"
+                value={String(form.status ?? DEFAULT_LEAD_STATUS)}
+                onChange={(e) => setField('status', e.target.value)}
+                helperText="Operational state."
+              >
+                {LEAD_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            </FormRow>
+
+            {/* Flight route/date details removed — itinerary is captured via the
               PNR HTML above. Origin/destination/dates default on the server. */}
 
-          {/* -------- Passengers */}
-          <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide pt-1">
-            <Users className="w-3.5 h-3.5 text-ember-primary" />
-            <span>Passengers &amp; Pax Details</span>
-          </div>
-
-          <PassengerList
-            passengers={
-              (form.passengers && form.passengers.length > 0)
-                ? form.passengers
-                : [{ id: `pax_${Date.now()}_0`, firstName: '', middleName: '', lastName: '', type: 'Adult', dob: '', gender: '' }]
-            }
-            onChange={handlePassengersChange}
-            errorFor={errorFor}
-            onFieldBlur={(key) => setTouched((t) => ({ ...t, [key]: true }))}
-            registerField={registerField}
-          />
-
-          <FormRow cols={2}>
-            <Select
-              label="Initial Stage"
-              value={String(form.stage ?? 'New')}
-              onChange={(e) => setField('stage', e.target.value)}
-            >
-              <option value="New">New</option>
-              <option value="Contacted">Contacted</option>
-              <option value="Quoted">Quoted</option>
-              <option value="Negotiation">Negotiation</option>
-              <option value="Booked">Booked</option>
-              <option value="Ticketed">Ticketed</option>
-            </Select>
-
-            <div className="hidden sm:block" />
-          </FormRow>
-
-          {/* Pricing: airline + consolidator charge, total auto-calculates (editable) */}
-          <FormRow cols={2}>
-            <Input
-              ref={registerField('airlineCharge')}
-              label="Airline Charge ($)"
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="e.g. 1200"
-              value={String(form.airlineCharge ?? '')}
-              onChange={(e) => onChargeChange('airlineCharge', e.target.value)}
-              onBlur={blur('airlineCharge')}
-              error={errorFor('airlineCharge')}
-            />
-            <Input
-              ref={registerField('airlineConsolidatorCharge')}
-              label="Airline Consolidator Charge ($)"
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="e.g. 250"
-              value={String(form.airlineConsolidatorCharge ?? '')}
-              onChange={(e) => onChargeChange('airlineConsolidatorCharge', e.target.value)}
-              onBlur={blur('airlineConsolidatorCharge')}
-              error={errorFor('airlineConsolidatorCharge')}
-            />
-          </FormRow>
-
-          <FormRow cols={2}>
-            <Input
-              ref={registerField('totalAmount')}
-              label="Total Amount ($)"
-              labelHint="Auto = Airline + Consolidator · editable"
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="0.00"
-              value={String(form.totalAmount ?? '')}
-              onChange={(e) => setField('totalAmount', e.target.value)}
-              onBlur={blur('totalAmount')}
-              error={errorFor('totalAmount')}
-            />
-            <Select
-              label="Template Pricing Display"
-              value={String(form.pricingDisplayMode ?? 'total')}
-              onChange={(e) => setField('pricingDisplayMode', e.target.value as 'total' | 'breakdown')}
-            >
-              <option value="total">Show Total Amount only</option>
-              <option value="breakdown">Show all three (breakdown)</option>
-            </Select>
-          </FormRow>
-
-          <FormRow cols={2}>
-            <Input
-              ref={registerField('nextFollowUpDate')}
-              label="Next Follow-Up Date"
-              type="date"
-              value={String(form.nextFollowUpDate ?? '')}
-              onChange={(e) => setField('nextFollowUpDate', e.target.value)}
-              onBlur={blur('nextFollowUpDate')}
-              error={errorFor('nextFollowUpDate')}
-            />
-
-            {user?.role === 'admin' ? (
-              <Select
-                label="Assign to Staff"
-                value={String(form.assignedTo ?? '')}
-                onChange={(e) => setField('assignedTo', e.target.value)}
-              >
-                <option value="">Auto-Assign (Round-Robin)</option>
-                <option value={UNASSIGNED_VALUE}>Unassigned (No Staff)</option>
-                {staffList
-                  .filter((s) => s.active)
-                  .map((staff) => (
-                    <option key={staff._id} value={staff._id}>
-                      {staff.name} ({staff.email})
-                    </option>
-                  ))}
-              </Select>
-            ) : (
-              <div className="text-xs text-ember-neutral flex items-center pt-6">
-                <span>Assigned to you ({user?.name})</span>
-              </div>
-            )}
-          </FormRow>
-
-          <Textarea
-            label="Remark"
-            labelHint="Optional"
-            placeholder="e.g. Prefers direct flight, premium economy, flexible on +/- 2 days."
-            rows={2}
-            value={String(form.initialNote ?? '')}
-            onChange={(e) => setField('initialNote', e.target.value)}
-          />
-
-          {/* Add-ons: Meal, Baggage, Seat */}
-          <div className="pt-3 border-t border-ember-border/60 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary">
-              <Sparkles className="w-3.5 h-3.5 text-ember-primary" />
-              <span>Add-ons &amp; Ancillary Services (Optional)</span>
+            {/* -------- Passengers */}
+            <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary uppercase tracking-wide pt-1">
+              <Users className="w-3.5 h-3.5 text-ember-primary" />
+              <span>Passengers &amp; Pax Details</span>
             </div>
+
+            <PassengerList
+              passengers={
+                (form.passengers && form.passengers.length > 0)
+                  ? form.passengers
+                  : [{ id: `pax_${Date.now()}_0`, firstName: '', middleName: '', lastName: '', type: 'Adult', dob: '', gender: '' }]
+              }
+              onChange={handlePassengersChange}
+              errorFor={errorFor}
+              onFieldBlur={(key) => setTouched((t) => ({ ...t, [key]: true }))}
+              registerField={registerField}
+            />
+
+            <FormRow cols={2}>
+              <Select
+                label="Initial Stage"
+                value={String(form.stage ?? 'New')}
+                onChange={(e) => setField('stage', e.target.value)}
+              >
+                <option value="New">New</option>
+                <option value="Contacted">Contacted</option>
+                <option value="Quoted">Quoted</option>
+                <option value="Negotiation">Negotiation</option>
+                <option value="Booked">Booked</option>
+                <option value="Ticketed">Ticketed</option>
+              </Select>
+
+              <div className="hidden sm:block" />
+            </FormRow>
+
+            {/* Pricing: airline + consolidator charge, total auto-calculates (editable) */}
+            <FormRow cols={2}>
+              <Input
+                ref={registerField('airlineCharge')}
+                label="Airline Charge ($)"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="e.g. 1200"
+                value={String(form.airlineCharge ?? '')}
+                onChange={(e) => onChargeChange('airlineCharge', e.target.value)}
+                onBlur={blur('airlineCharge')}
+                error={errorFor('airlineCharge')}
+              />
+              <Input
+                ref={registerField('airlineConsolidatorCharge')}
+                label="Airline Consolidator Charge ($)"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="e.g. 250"
+                value={String(form.airlineConsolidatorCharge ?? '')}
+                onChange={(e) => onChargeChange('airlineConsolidatorCharge', e.target.value)}
+                onBlur={blur('airlineConsolidatorCharge')}
+                error={errorFor('airlineConsolidatorCharge')}
+              />
+            </FormRow>
+
+            <FormRow cols={2}>
+              <Input
+                ref={registerField('totalAmount')}
+                label="Total Amount ($)"
+                labelHint="Auto = Airline + Consolidator · editable"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="0.00"
+                value={String(form.totalAmount ?? '')}
+                onChange={(e) => setField('totalAmount', e.target.value)}
+                onBlur={blur('totalAmount')}
+                error={errorFor('totalAmount')}
+              />
+              <Select
+                label="Template Pricing Display"
+                value={String(form.pricingDisplayMode ?? 'total')}
+                onChange={(e) => setField('pricingDisplayMode', e.target.value as 'total' | 'breakdown')}
+              >
+                <option value="total">Show Total Amount only</option>
+                <option value="breakdown">Show all three (breakdown)</option>
+              </Select>
+            </FormRow>
+
+            <FormRow cols={2}>
+              <Input
+                ref={registerField('nextFollowUpDate')}
+                label="Next Follow-Up Date"
+                type="date"
+                value={String(form.nextFollowUpDate ?? '')}
+                onChange={(e) => setField('nextFollowUpDate', e.target.value)}
+                onBlur={blur('nextFollowUpDate')}
+                error={errorFor('nextFollowUpDate')}
+              />
+
+              {user?.role === 'admin' ? (
+                <Select
+                  label="Assign to Staff"
+                  value={String(form.assignedTo ?? '')}
+                  onChange={(e) => setField('assignedTo', e.target.value)}
+                >
+                  <option value="">Auto-Assign (Round-Robin)</option>
+                  <option value={UNASSIGNED_VALUE}>Unassigned (No Staff)</option>
+                  {staffList
+                    .filter((s) => s.active)
+                    .map((staff) => (
+                      <option key={staff._id} value={staff._id}>
+                        {staff.name} ({staff.email})
+                      </option>
+                    ))}
+                </Select>
+              ) : (
+                <div className="text-xs text-ember-neutral flex items-center pt-6">
+                  <span>Assigned to you ({user?.name})</span>
+                </div>
+              )}
+            </FormRow>
+
+            <Textarea
+              label="Remark"
+              labelHint="Optional"
+              placeholder="e.g. Prefers direct flight, premium economy, flexible on +/- 2 days."
+              rows={2}
+              value={String(form.initialNote ?? '')}
+              onChange={(e) => setField('initialNote', e.target.value)}
+            />
+
+            {/* Add-ons: Meal, Baggage, Seat */}
+            <div className="pt-3 border-t border-ember-border/60 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-ember-text-primary">
+                <Sparkles className="w-3.5 h-3.5 text-ember-primary" />
+                <span>Add-ons &amp; Ancillary Services (Optional)</span>
+              </div>
+              <FormRow cols={3}>
+                <Input
+                  label="Meal Preference"
+                  placeholder="e.g. Vegetarian, Halal..."
+                  value={form.addOns?.meal ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), meal: e.target.value } }))}
+                />
+                <Input
+                  label="Baggage Allowance"
+                  placeholder="e.g. 2 x 23kg Bags..."
+                  value={form.addOns?.baggage ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), baggage: e.target.value } }))}
+                />
+                <Input
+                  label="Seat Selection"
+                  placeholder="e.g. Window, 14A..."
+                  value={form.addOns?.seat ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), seat: e.target.value } }))}
+                />
+              </FormRow>
+            </div>
+          </FormSection>
+
+          {/* -------------------------------------------- Billing Details */}
+          <FormSection
+            title="Billing Details"
+            description="Invoicing contact, address and payment instrument."
+            icon={<Wallet className="w-3.5 h-3.5" />}
+            aside="Optional"
+          >
+            <FormRow cols={2}>
+              <Input
+                ref={registerField('billing.email')}
+                label="Billing Email"
+                type="email"
+                placeholder="billing@example.com"
+                value={String(billing.email ?? '')}
+                onChange={(e) => setBilling({ email: e.target.value })}
+                onBlur={blur('billing.email')}
+                error={errorFor('billing.email')}
+              />
+              <PhoneField
+                ref={registerField('billing.phone')}
+                label="Billing Phone Number"
+                countryCode={String(billing.phoneDialCode ?? DEFAULT_COUNTRY_CODE)}
+                onCountryCodeChange={(code) => setBilling({ phoneDialCode: code })}
+                value={String(billing.phone ?? '')}
+                onValueChange={(v) => setBilling({ phone: v })}
+                onBlur={blur('billing.phone')}
+                error={errorFor('billing.phone')}
+              />
+            </FormRow>
+
+            <FormRow cols={2}>
+              <Input
+                ref={registerField('billing.alternatePhone')}
+                label="Alternate Number"
+                type="tel"
+                inputMode="tel"
+                placeholder="e.g. +1 555 987 6543"
+                helperText="A second number to try if the primary doesn’t answer."
+                value={String(billing.alternatePhone ?? '')}
+                onChange={(e) => setBilling({ alternatePhone: e.target.value })}
+                onBlur={blur('billing.alternatePhone')}
+                error={errorFor('billing.alternatePhone')}
+              />
+              <Select
+                ref={registerField('billing.countryCode')}
+                label="Country"
+                value={String(billing.countryCode ?? DEFAULT_COUNTRY_CODE)}
+                onChange={(e) => {
+                  const countryCode = e.target.value;
+                  // Keep the dial-code tab in step until the user types a number
+                  // of their own, then leave their choice alone.
+                  setBilling(
+                    billing.phone
+                      ? { countryCode }
+                      : { countryCode, phoneDialCode: countryCode }
+                  );
+                }}
+                helperText={`Dial code ${getDialCode(billing.countryCode) || '—'}`}
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.dial})
+                  </option>
+                ))}
+              </Select>
+            </FormRow>
+
+            <Input
+              ref={registerField('billing.addressLine1')}
+              label="Billing Address"
+              placeholder="Street address, P.O. box"
+              autoComplete="billing address-line1"
+              value={String(billing.addressLine1 ?? '')}
+              onChange={(e) => setBilling({ addressLine1: e.target.value })}
+              onBlur={blur('billing.addressLine1')}
+              error={errorFor('billing.addressLine1')}
+            />
+            <Input
+              aria-label="Billing address line 2"
+              placeholder="Apartment, suite, unit, floor (optional)"
+              autoComplete="billing address-line2"
+              value={String(billing.addressLine2 ?? '')}
+              onChange={(e) => setBilling({ addressLine2: e.target.value })}
+            />
+
             <FormRow cols={3}>
               <Input
-                label="Meal Preference"
-                placeholder="e.g. Vegetarian, Halal..."
-                value={form.addOns?.meal ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), meal: e.target.value } }))}
+                ref={registerField('billing.city')}
+                label="City"
+                placeholder="e.g. New York"
+                autoComplete="billing address-level2"
+                value={String(billing.city ?? '')}
+                onChange={(e) => setBilling({ city: e.target.value })}
+                onBlur={blur('billing.city')}
+                error={errorFor('billing.city')}
               />
               <Input
-                label="Baggage Allowance"
-                placeholder="e.g. 2 x 23kg Bags..."
-                value={form.addOns?.baggage ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), baggage: e.target.value } }))}
+                ref={registerField('billing.state')}
+                label="State / Province"
+                placeholder="e.g. NY"
+                autoComplete="billing address-level1"
+                value={String(billing.state ?? '')}
+                onChange={(e) => setBilling({ state: e.target.value })}
+                onBlur={blur('billing.state')}
+                error={errorFor('billing.state')}
               />
               <Input
-                label="Seat Selection"
-                placeholder="e.g. Window, 14A..."
-                value={form.addOns?.seat ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, addOns: { ...(f.addOns || {}), seat: e.target.value } }))}
+                ref={registerField('billing.postalCode')}
+                label="Postal / ZIP Code"
+                placeholder="e.g. 10001"
+                autoComplete="billing postal-code"
+                value={String(billing.postalCode ?? '')}
+                onChange={(e) => setBilling({ postalCode: e.target.value })}
+                onBlur={blur('billing.postalCode')}
+                error={errorFor('billing.postalCode')}
               />
             </FormRow>
-          </div>
-        </FormSection>
 
-        {/* -------------------------------------------- Billing Details */}
-        <FormSection
-          title="Billing Details"
-          description="Invoicing contact, address and payment instrument."
-          icon={<Wallet className="w-3.5 h-3.5" />}
-          aside="Optional"
-        >
-          <FormRow cols={2}>
-            <Input
-              ref={registerField('billing.email')}
-              label="Billing Email"
-              type="email"
-              placeholder="billing@example.com"
-              value={String(billing.email ?? '')}
-              onChange={(e) => setBilling({ email: e.target.value })}
-              onBlur={blur('billing.email')}
-              error={errorFor('billing.email')}
-            />
-            <PhoneField
-              ref={registerField('billing.phone')}
-              label="Billing Phone Number"
-              countryCode={String(billing.phoneDialCode ?? DEFAULT_COUNTRY_CODE)}
-              onCountryCodeChange={(code) => setBilling({ phoneDialCode: code })}
-              value={String(billing.phone ?? '')}
-              onValueChange={(v) => setBilling({ phone: v })}
-              onBlur={blur('billing.phone')}
-              error={errorFor('billing.phone')}
-            />
-          </FormRow>
+            {/* ------------------------------------ Card sub-block */}
+            <div className="mt-2 rounded-card border border-ember-border bg-ember-bg/60 p-3.5 space-y-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-3.5 h-3.5 text-ember-primary" />
+                <h5 className="text-xs font-bold text-ember-text-primary">
+                  Debit / Credit Card Details
+                </h5>
+                <span className="text-[10px] font-semibold text-ember-neutral">Optional</span>
+              </div>
 
-          <FormRow cols={2}>
-            <Input
-              ref={registerField('billing.alternatePhone')}
-              label="Alternate Number"
-              type="tel"
-              inputMode="tel"
-              placeholder="e.g. +1 555 987 6543"
-              helperText="A second number to try if the primary doesn’t answer."
-              value={String(billing.alternatePhone ?? '')}
-              onChange={(e) => setBilling({ alternatePhone: e.target.value })}
-              onBlur={blur('billing.alternatePhone')}
-              error={errorFor('billing.alternatePhone')}
-            />
-            <Select
-              ref={registerField('billing.countryCode')}
-              label="Country"
-              value={String(billing.countryCode ?? DEFAULT_COUNTRY_CODE)}
-              onChange={(e) => {
-                const countryCode = e.target.value;
-                // Keep the dial-code tab in step until the user types a number
-                // of their own, then leave their choice alone.
-                setBilling(
-                  billing.phone
-                    ? { countryCode }
-                    : { countryCode, phoneDialCode: countryCode }
-                );
-              }}
-              helperText={`Dial code ${getDialCode(billing.countryCode) || '—'}`}
-            >
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name} ({c.dial})
-                </option>
-              ))}
-            </Select>
-          </FormRow>
+              <FormRow cols={2}>
+                <Input
+                  ref={registerField('billing.card.holderName')}
+                  label="Card Holder Name"
+                  required={hasCardInput(card)}
+                  placeholder="Name as printed on the card"
+                  autoComplete="cc-name"
+                  value={String(card.holderName ?? '')}
+                  onChange={(e) => setCard({ holderName: e.target.value })}
+                  onBlur={blur('billing.card.holderName')}
+                  error={errorFor('billing.card.holderName')}
+                />
+                <CardNumberInput
+                  ref={registerField('billing.card.number')}
+                  label="Card / Account Number"
+                  required={hasCardInput(card)}
+                  value={String(card.number ?? '')}
+                  onValueChange={(v) => setCard({ number: v })}
+                  onBlur={blur('billing.card.number')}
+                  error={errorFor('billing.card.number')}
+                />
+              </FormRow>
 
-          <Input
-            ref={registerField('billing.addressLine1')}
-            label="Billing Address"
-            placeholder="Street address, P.O. box"
-            autoComplete="billing address-line1"
-            value={String(billing.addressLine1 ?? '')}
-            onChange={(e) => setBilling({ addressLine1: e.target.value })}
-            onBlur={blur('billing.addressLine1')}
-            error={errorFor('billing.addressLine1')}
-          />
-          <Input
-            aria-label="Billing address line 2"
-            placeholder="Apartment, suite, unit, floor (optional)"
-            autoComplete="billing address-line2"
-            value={String(billing.addressLine2 ?? '')}
-            onChange={(e) => setBilling({ addressLine2: e.target.value })}
-          />
+              <FormRow cols={2}>
+                <Input
+                  ref={registerField('billing.card.expiry')}
+                  label="Expiry Date"
+                  required={hasCardInput(card)}
+                  placeholder="MM/YY"
+                  inputMode="numeric"
+                  autoComplete="cc-exp"
+                  maxLength={5}
+                  value={String(card.expiry ?? '')}
+                  onChange={(e) => setCard({ expiry: formatExpiry(e.target.value) })}
+                  onBlur={blur('billing.card.expiry')}
+                  error={errorFor('billing.card.expiry')}
+                  className="font-code"
+                />
+                <Input
+                  ref={registerField('billing.card.cvv')}
+                  label="CVV / CVC"
+                  required={hasCardInput(card)}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                  placeholder={cardBrand === 'Amex' ? '4 digits' : '3 digits'}
+                  maxLength={cvvLength(cardBrand)}
+                  value={String(card.cvv ?? '')}
+                  onChange={(e) =>
+                    setCard({ cvv: digitsOnly(e.target.value).slice(0, cvvLength(cardBrand)) })
+                  }
+                  onBlur={blur('billing.card.cvv')}
+                  error={errorFor('billing.card.cvv')}
+                  className="font-code tracking-widest"
+                />
+              </FormRow>
 
-          <FormRow cols={3}>
-            <Input
-              ref={registerField('billing.city')}
-              label="City"
-              placeholder="e.g. New York"
-              autoComplete="billing address-level2"
-              value={String(billing.city ?? '')}
-              onChange={(e) => setBilling({ city: e.target.value })}
-              onBlur={blur('billing.city')}
-              error={errorFor('billing.city')}
-            />
-            <Input
-              ref={registerField('billing.state')}
-              label="State / Province"
-              placeholder="e.g. NY"
-              autoComplete="billing address-level1"
-              value={String(billing.state ?? '')}
-              onChange={(e) => setBilling({ state: e.target.value })}
-              onBlur={blur('billing.state')}
-              error={errorFor('billing.state')}
-            />
-            <Input
-              ref={registerField('billing.postalCode')}
-              label="Postal / ZIP Code"
-              placeholder="e.g. 10001"
-              autoComplete="billing postal-code"
-              value={String(billing.postalCode ?? '')}
-              onChange={(e) => setBilling({ postalCode: e.target.value })}
-              onBlur={blur('billing.postalCode')}
-              error={errorFor('billing.postalCode')}
-            />
-          </FormRow>
-
-          {/* ------------------------------------ Card sub-block */}
-          <div className="mt-2 rounded-card border border-ember-border bg-ember-bg/60 p-3.5 space-y-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-3.5 h-3.5 text-ember-primary" />
-              <h5 className="text-xs font-bold text-ember-text-primary">
-                Debit / Credit Card Details
-              </h5>
-              <span className="text-[10px] font-semibold text-ember-neutral">Optional</span>
+              <p className="flex items-start gap-1.5 text-[11px] text-ember-neutral">
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-px text-ember-warning" />
+                <span>
+                  Card details are stored on the lead record. Only enter them with the
+                  cardholder’s consent.
+                </span>
+              </p>
             </div>
-
-            <FormRow cols={2}>
-              <Input
-                ref={registerField('billing.card.holderName')}
-                label="Card Holder Name"
-                required={hasCardInput(card)}
-                placeholder="Name as printed on the card"
-                autoComplete="cc-name"
-                value={String(card.holderName ?? '')}
-                onChange={(e) => setCard({ holderName: e.target.value })}
-                onBlur={blur('billing.card.holderName')}
-                error={errorFor('billing.card.holderName')}
-              />
-              <CardNumberInput
-                ref={registerField('billing.card.number')}
-                label="Card / Account Number"
-                required={hasCardInput(card)}
-                value={String(card.number ?? '')}
-                onValueChange={(v) => setCard({ number: v })}
-                onBlur={blur('billing.card.number')}
-                error={errorFor('billing.card.number')}
-              />
-            </FormRow>
-
-            <FormRow cols={2}>
-              <Input
-                ref={registerField('billing.card.expiry')}
-                label="Expiry Date"
-                required={hasCardInput(card)}
-                placeholder="MM/YY"
-                inputMode="numeric"
-                autoComplete="cc-exp"
-                maxLength={5}
-                value={String(card.expiry ?? '')}
-                onChange={(e) => setCard({ expiry: formatExpiry(e.target.value) })}
-                onBlur={blur('billing.card.expiry')}
-                error={errorFor('billing.card.expiry')}
-                className="font-code"
-              />
-              <Input
-                ref={registerField('billing.card.cvv')}
-                label="CVV / CVC"
-                required={hasCardInput(card)}
-                type="password"
-                inputMode="numeric"
-                autoComplete="cc-csc"
-                placeholder={cardBrand === 'Amex' ? '4 digits' : '3 digits'}
-                maxLength={cvvLength(cardBrand)}
-                value={String(card.cvv ?? '')}
-                onChange={(e) =>
-                  setCard({ cvv: digitsOnly(e.target.value).slice(0, cvvLength(cardBrand)) })
-                }
-                onBlur={blur('billing.card.cvv')}
-                error={errorFor('billing.card.cvv')}
-                className="font-code tracking-widest"
-              />
-            </FormRow>
-
-            <p className="flex items-start gap-1.5 text-[11px] text-ember-neutral">
-              <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-px text-ember-warning" />
-              <span>
-                Card details are stored on the lead record. Only enter them with the
-                cardholder’s consent.
-              </span>
-            </p>
-          </div>
-        </FormSection>
-      </form>
-    </Drawer>
+          </FormSection>
+        </form>
+      </Drawer>
     </>
   );
 };

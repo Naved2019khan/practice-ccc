@@ -371,8 +371,16 @@ export async function GET(
       });
 
       // Notify the CS team the first time this customer opens the portal.
-      // Send once: skip if a successful notification was already logged.
-      const alreadyNotified = (lead.activityLog || []).some((a: any) => a.type === 'cs_notified');
+      // Send once: skip if a notification or authorization was already logged.
+      const alreadyNotified =
+        (lead.activityLog || []).some(
+          (a: any) =>
+            a.type === 'cs_notified' ||
+            a.type === 'cs_auth_notified' ||
+            a.type === 'booking_authorized'
+        ) ||
+        lead.paymentStatus === 'Authorized' ||
+        lead.paymentStatus === 'Paid';
       if (!alreadyNotified) {
         const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
         const proto = req.headers.get('x-forwarded-proto') || 'http';

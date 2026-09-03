@@ -123,8 +123,8 @@ export const LeadBillingManager: React.FC<LeadBillingManagerProps> = ({
   const formattedCardNumber = card.number
     ? card.number.replace(/(\d{4})/g, '$1 ').trim()
     : card.last4
-    ? `•••• •••• •••• ${card.last4}`
-    : 'No card on file';
+      ? `•••• •••• •••• ${card.last4}`
+      : 'No card on file';
 
   // Calculate if the card is Expired
   const now = new Date();
@@ -133,7 +133,7 @@ export const LeadBillingManager: React.FC<LeadBillingManagerProps> = ({
   const isExpired =
     card.expiryYear && card.expiryMonth
       ? card.expiryYear < currentYear ||
-        (card.expiryYear === currentYear && Number(card.expiryMonth) < currentMonth)
+      (card.expiryYear === currentYear && Number(card.expiryMonth) < currentMonth)
       : false;
 
   return (
@@ -222,10 +222,10 @@ export const LeadBillingManager: React.FC<LeadBillingManagerProps> = ({
                       ? card.number.replace(/(\d{4})/g, '$1 ').trim()
                       : formattedCardNumber
                     : card.last4
-                    ? `•••• •••• •••• ${card.last4}`
-                    : card.number
-                    ? `•••• •••• •••• ${card.number.slice(-4)}`
-                    : '•••• •••• •••• ••••'}
+                      ? `•••• •••• •••• ${card.last4}`
+                      : card.number
+                        ? `•••• •••• •••• ${card.number.slice(-4)}`
+                        : '•••• •••• •••• ••••'}
                 </p>
                 {card.number && (
                   <button
@@ -555,7 +555,7 @@ export const LeadBillingManager: React.FC<LeadBillingManagerProps> = ({
               <div>
                 <Input
                   label="CVV / CVC"
-                  type="password"
+                  type="text"
                   placeholder="3 or 4 digits"
                   maxLength={4}
                   value={form.card?.cvv || ''}

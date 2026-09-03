@@ -10,10 +10,10 @@ export async function seedDatabase(force = false) {
   await connectToDatabase();
 
   const userCount = await User.countDocuments();
-  if (userCount > 0 && !force) {
-    console.log('Database already has data. Skipping seed.');
-    return { success: true, message: 'Database already seeded' };
-  }
+  // if (userCount > 0 && !force) {
+  //   console.log('Database already has data. Skipping seed.');
+  //   return { success: true, message: 'Database already seeded' };
+  // }
 
   console.log('🌱 Seeding Flight CRM database with realistic data...');
 
@@ -21,21 +21,22 @@ export async function seedDatabase(force = false) {
     await User.deleteMany({});
     await Lead.deleteMany({});
     await Task.deleteMany({});
-    await EmailTemplate.deleteMany({});
+    // await EmailTemplate.deleteMany({});
     await Setting.deleteMany({});
   }
 
   // 1. Create Users
-  const adminPassword = await hashPassword('admin123');
+  const adminPassword = await hashPassword('@Airline#5005@');
   const staffPassword = await hashPassword('staff123');
+
 
   const admin = await User.create({
     name: 'Admin',
-    email: 'admin@flightcrm.com',
+    email: 'admin@airlinesconsolidator.com',
     password: adminPassword,
     role: 'admin',
     active: true,
-    phone: '+1 (888) 883-0727',
+    phone: '',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   });
 

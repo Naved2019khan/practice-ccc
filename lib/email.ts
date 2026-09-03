@@ -168,9 +168,60 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailDispatc
     };
   }
 
+  // 3. GoDaddy Professional Email / Workspace SMTP Mode
+  if (provider === 'godaddy' || provider === 'workspace') {
+    try {
+      const gdUser = process.env.GODADDY_SMTP_USER || process.env.GODADDY_EMAIL || '';
+      const gdPassword = process.env.GODADDY_SMTP_PASSWORD || '';
+      const gdHost = process.env.GODADDY_SMTP_HOST || 'smtpout.secureserver.net';
+      const gdPort = parseInt(process.env.GODADDY_SMTP_PORT || '465', 10);
+
+      if (!gdUser || !gdPassword) {
+        throw new Error(
+          'GoDaddy SMTP credentials are not configured. Please set GODADDY_SMTP_USER and GODADDY_SMTP_PASSWORD in .env.'
+        );
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: gdHost,
+        port: gdPort,
+        secure: gdPort === 465,
+        auth: {
+          user: gdUser,
+          pass: gdPassword,
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+      });
+
+      const fromAddress =
+        options.from ||
+        process.env.GODADDY_FROM_EMAIL ||
+        gdUser;
+
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments,
+      });
+
+      return { success: true, messageId: info.messageId };
+    } catch (err: any) {
+      console.error('[GoDaddy SMTP Dispatch Error]:', err);
+      return {
+        success: false,
+        error: err.message || 'Failed to dispatch email via GoDaddy SMTP',
+      };
+    }
+  }
+
   return {
     success: false,
-    error: `Unknown email provider: "${provider}". Use "gmail", "ses", or "mock".`,
+    error: `Unknown email provider: "${provider}". Use "gmail", "ses", "godaddy", or "mock".`,
   };
 }
 

@@ -3,14 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Code2, Image as ImageIcon, Mail, Server, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Code2, Image as ImageIcon, Mail, Server, CheckCircle2, AlertCircle, RefreshCw, Eye } from 'lucide-react';
 import { Chip } from '@/components/ui/Chip';
 
 interface DeveloperHeaderProps {
   envStatus?: any;
   loadingEnv?: boolean;
   onRefresh?: () => void;
-  activeTab?: 's3' | 'email';
+  activeTab?: 's3' | 'email' | 'viewers';
 }
 
 export const DeveloperHeader: React.FC<DeveloperHeaderProps> = ({
@@ -23,9 +23,11 @@ export const DeveloperHeader: React.FC<DeveloperHeaderProps> = ({
 
   const isS3Tab = activeTab === 's3';
   const isEmailTab = activeTab === 'email';
+  const isViewersTab = activeTab === 'viewers';
 
   const s3Ready = envStatus?.s3?.isConfigured;
   const smtpReady = envStatus?.smtp?.isConfigured;
+  const gdReady = envStatus?.godaddy?.isConfigured;
 
   return (
     <div className="space-y-6">
@@ -93,6 +95,23 @@ export const DeveloperHeader: React.FC<DeveloperHeaderProps> = ({
                 <span>SES SMTP: {smtpReady ? 'Ready' : 'Incomplete'}</span>
               </div>
 
+              {/* GoDaddy SMTP status badge */}
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  gdReady
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}
+                title={
+                  gdReady
+                    ? `GoDaddy SMTP: ${envStatus?.godaddy?.host}:${envStatus?.godaddy?.port} (${envStatus?.godaddy?.maskedUser})`
+                    : 'GoDaddy SMTP credentials missing in .env'
+                }
+              >
+                {gdReady ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-600" />}
+                <span>GoDaddy: {gdReady ? 'Ready' : 'Incomplete'}</span>
+              </div>
+
               {onRefresh && (
                 <button
                   onClick={onRefresh}
@@ -134,9 +153,21 @@ export const DeveloperHeader: React.FC<DeveloperHeaderProps> = ({
         >
           <Mail className="w-4 h-4" />
           <span>Email / SMTP Tester</span>
-          {smtpReady && (
+          {(smtpReady || gdReady) && (
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
           )}
+        </Link>
+
+        <Link
+          href="/developer?tab=viewers"
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+            isViewersTab
+              ? 'border-ember-primary text-ember-primary bg-ember-primary/5 rounded-t-md'
+              : 'border-transparent text-ember-text-secondary hover:text-ember-text-primary hover:border-ember-border'
+          }`}
+        >
+          <Eye className="w-4 h-4" />
+          <span>Portal Viewers</span>
         </Link>
       </div>
     </div>

@@ -67,10 +67,11 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
   const activeEnvProvider = envStatus?.activeProvider || 'gmail';
   const gmailConfig = envStatus?.gmail;
   const sesConfig = envStatus?.smtp;
+  const gdConfig = envStatus?.godaddy;
 
-  // Selected provider for tester: 'gmail' | 'smtp' (SES SMTP) | 'ses_api' (SES SDK)
-  const [selectedProvider, setSelectedProvider] = useState<'gmail' | 'smtp' | 'ses_api'>(
-    activeEnvProvider === 'gmail' ? 'gmail' : 'smtp'
+  // Selected provider for tester: 'gmail' | 'smtp' (SES SMTP) | 'ses_api' (SES SDK) | 'godaddy'
+  const [selectedProvider, setSelectedProvider] = useState<'gmail' | 'smtp' | 'ses_api' | 'godaddy'>(
+    activeEnvProvider === 'gmail' ? 'gmail' : activeEnvProvider === 'godaddy' ? 'godaddy' : 'smtp'
   );
 
   // Connection Test state
@@ -92,10 +93,12 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
   useEffect(() => {
     if (selectedProvider === 'gmail' && gmailConfig?.defaultFromEmail) {
       setFromEmail(gmailConfig.defaultFromEmail);
-    } else if (selectedProvider !== 'gmail' && sesConfig?.defaultFromEmail) {
+    } else if (selectedProvider === 'godaddy' && gdConfig?.defaultFromEmail) {
+      setFromEmail(gdConfig.defaultFromEmail);
+    } else if (selectedProvider !== 'gmail' && selectedProvider !== 'godaddy' && sesConfig?.defaultFromEmail) {
       setFromEmail(sesConfig.defaultFromEmail);
     }
-  }, [selectedProvider, gmailConfig?.defaultFromEmail, sesConfig?.defaultFromEmail]);
+  }, [selectedProvider, gmailConfig?.defaultFromEmail, sesConfig?.defaultFromEmail, gdConfig?.defaultFromEmail]);
 
   // Run Connection handshake test
   const handleTestConnection = async () => {
@@ -164,8 +167,11 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
   };
 
   const isGmailActive = selectedProvider === 'gmail';
+  const isGodaddyActive = selectedProvider === 'godaddy';
   const isCurrentProviderReady = isGmailActive
     ? gmailConfig?.isConfigured
+    : isGodaddyActive
+    ? gdConfig?.isConfigured
     : selectedProvider === 'ses_api'
     ? envStatus?.s3?.hasCredentials
     : sesConfig?.isConfigured;
@@ -184,7 +190,7 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
             </span>
           </div>
           <p className="text-[11px] text-ember-neutral mt-0.5">
-            Switch test mode below to verify either Gmail SMTP or Amazon SES credentials.
+            Switch test mode below to verify Gmail, GoDaddy, or Amazon SES credentials.
           </p>
         </div>
 
@@ -222,6 +228,17 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
           >
             AWS SES (SDK API)
           </button>
+          <button
+            type="button"
+            onClick={() => setSelectedProvider('godaddy')}
+            className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+              selectedProvider === 'godaddy'
+                ? 'bg-white text-ember-primary shadow-sm'
+                : 'text-ember-neutral hover:text-ember-text-primary'
+            }`}
+          >
+            GoDaddy SMTP
+          </button>
         </div>
       </div>
 
@@ -237,6 +254,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
                 <span>
                   {isGmailActive
                     ? 'Gmail SMTP Configuration Checklist'
+                    : isGodaddyActive
+                    ? 'GoDaddy Workspace SMTP Checklist'
                     : selectedProvider === 'ses_api'
                     ? 'AWS SES API Configuration Checklist'
                     : 'AWS SES SMTP Configuration Checklist'}
@@ -254,6 +273,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
               <p className="text-xs text-ember-text-secondary">
                 {isGmailActive
                   ? 'Verifies Gmail user and Google App Password loaded from .env.'
+                  : isGodaddyActive
+                  ? 'Verifies GoDaddy Workspace Email SMTP credentials from .env.'
                   : 'Verifies AWS SES host, port, username, and password loaded from .env.'}
               </p>
             </div>
@@ -268,7 +289,10 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
               className="shrink-0 gap-1.5 text-xs"
             >
               <Zap className="w-3.5 h-3.5 text-amber-600" />
-              <span>Test Connection ({isGmailActive ? 'Gmail' : 'SES SMTP'})</span>
+              <span>
+                Test Connection (
+                {isGmailActive ? 'Gmail' : isGodaddyActive ? 'GoDaddy' : 'SES SMTP'})
+              </span>
             </Button>
           )}
         </div>
@@ -309,6 +333,70 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
               </div>
               <p className="font-mono text-xs text-ember-text-primary">
                 {gmailConfig?.isConfigured ? '✓ Configured in .env' : 'Missing Password'}
+              </p>
+            </div>
+          </div>
+        ) : isGodaddyActive ? (
+          /* GoDaddy SMTP Checklist */
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-btn bg-ember-bg border border-ember-border space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-ember-neutral font-semibold">SMTP Host</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="font-mono text-xs text-ember-text-primary truncate" title={gdConfig?.host}>
+                {gdConfig?.host || 'smtpout.secureserver.net'}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-btn bg-ember-bg border border-ember-border space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-ember-neutral font-semibold">Port</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="font-mono text-xs text-ember-text-primary">
+                {gdConfig?.port || 465}
+                {(gdConfig?.port || 465) === 465 ? ' (SSL)' : ' (STARTTLS)'}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-btn bg-ember-bg border border-ember-border space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-ember-neutral font-semibold">Username</span>
+                {gdConfig?.hasUser ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                )}
+              </div>
+              <p className="font-mono text-xs text-ember-text-primary truncate">
+                {gdConfig?.maskedUser || 'Missing GODADDY_SMTP_USER'}
+              </p>
+            </div>
+
+            <div className="p-3 rounded-btn bg-ember-bg border border-ember-border space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-ember-neutral font-semibold">Password</span>
+                {gdConfig?.hasPassword ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                )}
+              </div>
+              <p className="font-mono text-xs text-ember-text-primary">
+                {gdConfig?.hasPassword ? '✓ Set in .env' : 'Missing GODADDY_SMTP_PASSWORD'}
+              </p>
+            </div>
+
+            <div className="p-3 col-span-full rounded-btn bg-amber-50 border border-amber-200 space-y-1">
+              <p className="text-[11px] text-amber-800 font-semibold">GoDaddy Workspace SMTP Settings</p>
+              <p className="text-[11px] text-amber-700 font-mono">
+                Host: smtpout.secureserver.net &nbsp;·&nbsp; Port: 465 (SSL) or 587 (STARTTLS)
+              </p>
+              <p className="text-[11px] text-amber-700">
+                Username = your full GoDaddy email (e.g.{' '}
+                <span className="font-mono">support@airlinesconsolidator.com</span>). Password =
+                your Workspace Email account password.
               </p>
             </div>
           </div>
@@ -428,6 +516,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
                 Send Test Email via{' '}
                 {selectedProvider === 'gmail'
                   ? 'Gmail SMTP'
+                  : selectedProvider === 'godaddy'
+                  ? 'GoDaddy Workspace SMTP'
                   : selectedProvider === 'ses_api'
                   ? 'AWS SES API'
                   : 'AWS SES SMTP'}
@@ -472,6 +562,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
               <p className="text-[10px] text-ember-neutral">
                 {isGmailActive
                   ? 'Your Gmail account address.'
+                  : isGodaddyActive
+                  ? 'Your full GoDaddy Workspace Email address.'
                   : 'Must be verified identity in AWS SES Console.'}
               </p>
             </div>
@@ -556,6 +648,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
                 <strong>
                   {selectedProvider === 'gmail'
                     ? 'Gmail SMTP'
+                    : selectedProvider === 'godaddy'
+                    ? 'GoDaddy Workspace SMTP'
                     : selectedProvider === 'ses_api'
                     ? 'AWS SES API (SDK)'
                     : 'AWS SES SMTP'}
@@ -569,6 +663,8 @@ export const SmtpTester: React.FC<SmtpTesterProps> = ({ envStatus }) => {
                 Send Test Email (
                 {selectedProvider === 'gmail'
                   ? 'Gmail'
+                  : selectedProvider === 'godaddy'
+                  ? 'GoDaddy'
                   : selectedProvider === 'ses_api'
                   ? 'SES API'
                   : 'SES SMTP'}

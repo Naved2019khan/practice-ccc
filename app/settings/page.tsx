@@ -2,22 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Settings as SettingsIcon,
-  RefreshCw,
   Mail,
   Send,
-  Shield,
   CheckCircle2,
   AlertCircle,
-  Database,
   Users,
-  Compass,
 } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<any>({
@@ -34,10 +28,6 @@ export default function SettingsPage() {
   const [testEmail, setTestEmail] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
-
-  // Reseed state
-  const [isReseeding, setIsReseeding] = useState(false);
-  const [reseedMsg, setReseedMsg] = useState('');
 
   const fetchSettings = async () => {
     try {
@@ -100,28 +90,6 @@ export default function SettingsPage() {
       setTestResult({ success: false, error: err.message });
     } finally {
       setIsSendingTest(false);
-    }
-  };
-
-  const handleReseedDatabase = async () => {
-    if (!confirm('Are you sure you want to reset and reseed sample database data?')) return;
-    setIsReseeding(true);
-    setReseedMsg('');
-
-    try {
-      const res = await fetch('/api/seed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force: true }),
-      });
-
-      const data = await res.json();
-      setReseedMsg(data.message || 'Database reseeded successfully!');
-      fetchSettings();
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setIsReseeding(false);
     }
   };
 
@@ -281,53 +249,6 @@ export default function SettingsPage() {
             )}
           </form>
         </Card>
-
-        {/* Section 3: Database Utilities */}
-        {currentUser?.role === 'admin' && (
-          <Card elevated className="space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-ember-border">
-              <div className="w-8 h-8 rounded-btn bg-stone-200 text-stone-700 flex items-center justify-center">
-                <Database className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-ember-text-primary">
-                  Database Tools & Sample Demo Data
-                </h2>
-                <p className="text-xs text-ember-text-secondary">
-                  Reset and populate CRM with realistic flight leads, tasks, and email templates.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-ember-text-primary">
-                  Seed / Reset Realistic Sample Dataset
-                </p>
-                <p className="text-[11px] text-ember-neutral">
-                  Generates Admin & Staff accounts, flight itineraries, notes, and urgent follow-up badges.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                isLoading={isReseeding}
-                onClick={handleReseedDatabase}
-                className="gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reset & Seed Database</span>
-              </Button>
-            </div>
-
-            {reseedMsg && (
-              <div className="p-3 rounded-btn bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>{reseedMsg}</span>
-              </div>
-            )}
-          </Card>
-        )}
       </div>
     </AppLayout>
   );

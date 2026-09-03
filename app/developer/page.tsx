@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/AppLayout';
 import { DeveloperHeader } from '@/components/dev/DeveloperHeader';
 import { S3Manager } from '@/components/dev/S3Manager';
 import { SmtpTester } from '@/components/dev/SmtpTester';
+import { PortalViewers } from '@/components/dev/PortalViewers';
 
 function DeveloperToolsContent() {
   if (process.env.NODE_ENV === 'production') {
@@ -13,8 +14,8 @@ function DeveloperToolsContent() {
   }
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'s3' | 'email'>(
-    tabParam === 'email' ? 'email' : 's3'
+  const [activeTab, setActiveTab] = useState<'s3' | 'email' | 'viewers'>(
+    tabParam === 'email' ? 'email' : tabParam === 'viewers' ? 'viewers' : 's3'
   );
 
   const [envStatus, setEnvStatus] = useState<any>(null);
@@ -42,6 +43,8 @@ function DeveloperToolsContent() {
   useEffect(() => {
     if (tabParam === 'email' || tabParam === 's3') {
       setActiveTab(tabParam);
+    } else if (tabParam === 'viewers') {
+      setActiveTab('viewers');
     }
   }, [tabParam]);
 
@@ -56,8 +59,10 @@ function DeveloperToolsContent() {
 
       {activeTab === 's3' ? (
         <S3Manager envStatus={envStatus} />
-      ) : (
+      ) : activeTab === 'email' ? (
         <SmtpTester envStatus={envStatus} />
+      ) : (
+        <PortalViewers />
       )}
     </div>
   );

@@ -17,6 +17,16 @@ export interface SmtpConfigInfo {
   isGmailConfigured: boolean;
 }
 
+export interface GodaddyConfigInfo {
+  host: string;
+  port: number;
+  user: string;
+  fromEmail: string;
+  hasPassword: boolean;
+  isConfigured: boolean;
+  maskedUser: string;
+}
+
 /**
  * Calculates AWS SES SMTP password from an IAM Secret Access Key (SigV4)
  */
@@ -78,6 +88,58 @@ export function getSmtpConfig(): SmtpConfigInfo {
   };
 }
 
+export function getGodaddyConfig(): GodaddyConfigInfo {
+  const user = process.env.GODADDY_SMTP_USER || process.env.GODADDY_EMAIL || '';
+  const password = process.env.GODADDY_SMTP_PASSWORD || '';
+  const host = process.env.GODADDY_SMTP_HOST || 'smtpout.secureserver.net';
+  const port = parseInt(process.env.GODADDY_SMTP_PORT || '465', 10);
+  const fromEmail =
+    process.env.GODADDY_FROM_EMAIL ||
+    user ||
+    'support@airlinesconsolidator.com';
+
+  const maskedUser =
+    user.length > 8
+      ? `${user.substring(0, 3)}...${user.substring(user.indexOf('@') > -1 ? user.indexOf('@') : user.length - 4)}`
+      : user
+      ? '***'
+      : 'Not configured';
+
+  return {
+    host,
+    port,
+    user,
+    fromEmail,
+    hasPassword: Boolean(password),
+    isConfigured: Boolean(user && password),
+    maskedUser,
+  };
+}
+
+export function createGodaddyTransporter() {
+  const cfg = getGodaddyConfig();
+  const password = process.env.GODADDY_SMTP_PASSWORD || '';
+
+  if (!cfg.user || !password) {
+    throw new Error(
+      'GoDaddy SMTP credentials (GODADDY_SMTP_USER, GODADDY_SMTP_PASSWORD) are missing from .env.'
+    );
+  }
+
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+    auth: {
+      user: cfg.user,
+      pass: password,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
+}
+
 export function createGmailTransporter() {
   const user = process.env.GMAIL_USER || process.env.SMTP_USER || '';
   const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD || '';
@@ -131,7 +193,7 @@ export function createSmtpTransporter(useDerivedIam = false) {
   });
 }
 
-export async function testSmtpConnection(options?: { provider?: 'gmail' | 'smtp' | 'ses_api'; useDerivedIam?: boolean }): Promise<{
+export async function testSmtpConnection(options?: { provider?: 'gmail' | 'smtp' | 'ses_api' | 'godaddy'; useDerivedIam?: boolean }): Promise<{
   success: boolean;
   message: string;
   details: {
@@ -147,7 +209,7 @@ export async function testSmtpConnection(options?: { provider?: 'gmail' | 'smtp'
   error?: string;
   troubleshooting?: string[];
 }> {
-  const provider = options?.provider || (process.env.EMAIL_PROVIDER === 'gmail' ? 'gmail' : 'smtp');
+  const provider = options?.provider || (process.env.EMAIL_PROVIDER === 'gmail' ? 'gmail' : process.env.EMAIL_PROVIDER === 'godaddy' ? 'godaddy' : 'smtp');
   const config = getSmtpConfig();
   const startTime = Date.now();
 
@@ -213,6 +275,70 @@ export async function testSmtpConnection(options?: { provider?: 'gmail' | 'smtp'
         troubleshooting: [
           'Make sure you are using a Google App Password (not your regular account password).',
           'Ensure 2-Step Verification is enabled on your Google Account.',
+        ],
+      };
+    }
+  }
+
+  // Test GoDaddy SMTP
+  if (provider === 'godaddy') {
+    const gdConfig = getGodaddyConfig();
+    if (!gdConfig.isConfigured) {
+      return {
+        success: false,
+        message: 'GoDaddy SMTP credentials missing from .env.',
+        details: {
+          host: gdConfig.host,
+          port: gdConfig.port,
+          provider: 'GoDaddy SMTP',
+          authConfigured: false,
+          maskedUser: gdConfig.maskedUser,
+        },
+        error: 'Please set GODADDY_SMTP_USER and GODADDY_SMTP_PASSWORD in .env.',
+        troubleshooting: [
+          'In your GoDaddy Workspace Email panel, go to Email Accounts → the account you want → Settings.',
+          'SMTP host is smtpout.secureserver.net, port 465 (SSL) or 587 (STARTTLS).',
+          'Username = your full GoDaddy email address (e.g. support@airlinesconsolidator.com).',
+          'Password = your Workspace Email account password.',
+        ],
+      };
+    }
+
+    try {
+      const transporter = createGodaddyTransporter();
+      await transporter.verify();
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: true,
+        message: 'GoDaddy SMTP handshake and authentication verified successfully!',
+        details: {
+          host: gdConfig.host,
+          port: gdConfig.port,
+          provider: 'GoDaddy SMTP',
+          authConfigured: true,
+          maskedUser: gdConfig.maskedUser,
+          latencyMs,
+        },
+      };
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: false,
+        message: 'GoDaddy SMTP connection failed.',
+        details: {
+          host: gdConfig.host,
+          port: gdConfig.port,
+          provider: 'GoDaddy SMTP',
+          authConfigured: true,
+          maskedUser: gdConfig.maskedUser,
+          latencyMs,
+        },
+        error: err.message || 'GoDaddy authentication failed',
+        troubleshooting: [
+          'Double-check your Workspace Email password — GoDaddy does not use App Passwords.',
+          'Make sure the account exists and is active in your GoDaddy Workspace Email panel.',
+          'Try port 587 (STARTTLS) by setting GODADDY_SMTP_PORT=587 if 465 is blocked.',
+          'Contact GoDaddy support if SMTP access is disabled on your hosting plan.',
         ],
       };
     }
@@ -316,14 +442,14 @@ export async function sendTestSmtpEmail({
   subject,
   message,
   isHtml = true,
-  method = 'gmail', // 'gmail' | 'smtp' | 'ses_api'
+  method = 'gmail', // 'gmail' | 'smtp' | 'ses_api' | 'godaddy'
 }: {
   from?: string;
   to: string;
   subject: string;
   message: string;
   isHtml?: boolean;
-  method?: 'gmail' | 'smtp' | 'ses_api';
+  method?: 'gmail' | 'smtp' | 'ses_api' | 'godaddy';
 }): Promise<{
   success: boolean;
   messageId?: string;
@@ -336,6 +462,8 @@ export async function sendTestSmtpEmail({
   const defaultFrom =
     method === 'gmail'
       ? process.env.GMAIL_FROM_EMAIL || config.gmailUser || 'Flight CRM <notifications@flightcrm.com>'
+      : method === 'godaddy'
+      ? process.env.GODADDY_FROM_EMAIL || process.env.GODADDY_SMTP_USER || process.env.GODADDY_EMAIL || 'support@airlinesconsolidator.com'
       : process.env.SES_FROM_EMAIL || 'Flight CRM <notifications@flightcrm.com>';
   const fromAddress = from?.trim() || defaultFrom;
 
@@ -377,7 +505,36 @@ export async function sendTestSmtpEmail({
     }
   }
 
-  // Method 2: AWS SES API SDK
+  // Method 2: GoDaddy Workspace SMTP
+  if (method === 'godaddy') {
+    try {
+      const transporter = createGodaddyTransporter();
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to: to.trim(),
+        subject: subject.trim(),
+        ...(isHtml ? { html: message, text: message.replace(/<[^>]*>?/gm, '') } : { text: message }),
+      });
+      return {
+        success: true,
+        messageId: info.messageId,
+        response: info.response,
+        methodUsed: 'GoDaddy SMTP',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message || 'GoDaddy SMTP send failed',
+        methodUsed: 'GoDaddy SMTP',
+        troubleshooting: [
+          'Verify GODADDY_SMTP_USER (full email) and GODADDY_SMTP_PASSWORD in .env.',
+          'Check smtpout.secureserver.net port 465 (SSL) is accessible from your server.',
+        ],
+      };
+    }
+  }
+
+  // Method 3: AWS SES API SDK
   if (method === 'ses_api') {
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID || process.env.SES_KEY;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.SES_SECRET;
